@@ -1,0 +1,39 @@
+\frametitle{Task 1: Solution}
+\protect\hypertarget{task-1-solution}{}
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{tier }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\DecValTok{3}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{2}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{1}\NormalTok{)}
+
+\NormalTok{tier\_f }\OtherTok{\textless{}{-}} \FunctionTok{factor}\NormalTok{(tier, }\AttributeTok{levels =} \DecValTok{1}\SpecialCharTok{:}\DecValTok{3}\NormalTok{, }\AttributeTok{labels =} \FunctionTok{c}\NormalTok{(}\StringTok{"Bronze"}\NormalTok{, }\StringTok{"Silver"}\NormalTok{, }\StringTok{"Gold"}\NormalTok{))}
+\FunctionTok{table}\NormalTok{(tier\_f)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+tier_f
+Bronze Silver   Gold
+     4      2      3
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{tier\_f }\OtherTok{\textless{}{-}} \FunctionTok{fct\_relevel}\NormalTok{(tier\_f, }\StringTok{"Silver"}\NormalTok{)}
+\FunctionTok{levels}\NormalTok{(tier\_f)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+[1] "Silver" "Bronze" "Gold"
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{fct\_collapse}\NormalTok{(tier\_f, }\AttributeTok{Premium =} \FunctionTok{c}\NormalTok{(}\StringTok{"Silver"}\NormalTok{, }\StringTok{"Gold"}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+[1] Premium Bronze  Premium Premium Bronze  Premium Premium Bronze
+[9] Bronze
+Levels: Premium Bronze
+\end{verbatim}

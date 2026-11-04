@@ -1,0 +1,911 @@
+---
+title: "Session 2: Data Types and Structures"
+subtitle: "R Workshop for DBA Students"
+author: "Taikgun Song"
+date: today
+format:
+  beamer:
+    theme: Madrid
+    colortheme: default
+    aspectratio: 169          # widescreen; use 43 for 4:3
+    navigation: empty         # hide beamer's navigation symbols
+    toc: true                 # outline slide after the title
+    toc-title: "Outline"
+    number-sections: true     # needed for @sec- cross-references
+    slide-level: 2            # # = section, ## = new slide
+    pdf-engine: xelatex       # handles Unicode in R output
+    include-in-header:
+      text: |
+        \usepackage{etoolbox}
+        % Smaller font for code and output so they fit on slides
+        \AtBeginEnvironment{Shaded}{\scriptsize}
+        \makeatletter
+        \def\verbatim@font{\scriptsize\ttfamily}
+        \makeatother
+        % Outline slide at the start of each section
+        \AtBeginSection[]{\begin{frame}{Outline}\tableofcontents[currentsection]\end{frame}}
+execute:
+  echo: true
+  warning: true
+---
+
+<!--
+HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
+- Companion to session2.qmd (the HTML handout). Same content, condensed into slides.
+- # Heading      = a new section (appears in the outline)
+- ## Heading     = a new slide
+- ### Heading    = a box on the slide; add {.alert} for a red box, {.example} for a green box
+- {.allowframebreaks} after a slide title lets a long slide continue onto the next page
+- Rendering to PDF needs LaTeX. One-time setup, in the RStudio Terminal:
+      quarto install tinytex
+- Requires: tidyverse, car (installs carData). Both are in the Session 1 install list.
+- Images in images/ must exist, or the PDF will not render.
+-->
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(carData)
+
+options(width = 70,               # narrower output so it fits on a slide
+        useFancyQuotes = FALSE,   # plain quotes in regression output
+        pillar.width = 70)
+
+dollars <- function(x) paste0("\\$", format(round(x), big.mark = ","))
+```
+
+## Session Objectives
+
+By the end of this session, you will be able to:
+
+1. Explain why the way a variable is *stored* determines how R, and your statistical models, treat it
+2. Identify R's basic data types and the special types built on them (factor, Date, date-time)
+3. Create and modify **factors**, including applying a data dictionary and setting a reference level
+4. Read regression output for a categorical predictor under reference coding and one-hot coding
+5. Create, subset, and modify R's data structures: vector, matrix, array, list, and data frame
+
+## Before You Start
+
+- Open your workshop RStudio Project (Session 1)
+- Load the packages for today:
+
+```{r}
+#| label: setup-shown
+#| eval: false
+
+library(tidyverse)   # includes dplyr, ggplot2, forcats, lubridate
+library(carData)     # installed together with the car package
+```
+
+- If you get an error, install them first:
+
+```{r}
+#| eval: false
+
+install.packages(c("tidyverse", "car"))
+```
+
+# Why Data Types Matter {#sec-why}
+
+## Excel vs. R
+
+- In Excel, a cell can hold anything, and Excel guesses what you meant
+- In R, every value has a **type**, and the type decides what you can do with it
+- Getting the type right is not a technicality: **it changes the answers your models give you**
+
+## Numbers That Are Not Really Numbers {#sec-coded}
+
+:::: {.columns}
+::: {.column width="55%"}
+- Census, government surveys, and corporate databases often store categories as **numeric codes** to save space
+- A **data dictionary** (codebook) says what each code means
+- The dictionary is for humans. R only sees the numbers
+:::
+::: {.column width="45%"}
+| Code | Department |
+|------|------------|
+| 1 | Sales |
+| 2 | HR |
+| 3 | IT |
+:::
+::::
+
+## What R Sees
+
+R reads `department` as an **integer** and happily does arithmetic with it:
+
+```{r}
+#| label: coded-department
+
+department <- c(1, 3, 2, 1, 1, 3, 2, 3)
+
+typeof(department)
+mean(department)                # the "average department"?
+department[1] < department[2]   # is Sales "less than" IT?
+```
+
+## Why It Matters for Regression
+
+If `department` stays numeric, a regression estimates **one slope** for it:
+
+- It assumes HR is "one unit more" than Sales, and IT "two units more"
+- But 1, 2, 3 were **arbitrary labels**. Code IT as 1 and the model gives a different answer
+- Underneath, `department` is a category, not a quantity
+
+### The fix
+Convert it to a **factor** and apply the data dictionary (next slide). More on factors in @sec-factors and on regression in @sec-lm.
+
+## Apply the Data Dictionary
+
+```{r}
+#| label: coded-department-fixed
+
+department <- factor(department,
+                     levels = c(1, 2, 3),
+                     labels = c("Sales", "HR", "IT"))
+department
+table(department)
+```
+
+## Likert Items: A Gray Area {#sec-likert}
+
+:::: {.columns}
+::: {.column width="50%"}
+*"I am satisfied with my manager"*
+
+| Code | Response |
+|------|----------|
+| 1 | Strongly disagree |
+| 2 | Disagree |
+| 3 | Neutral |
+| 4 | Agree |
+| 5 | Strongly agree |
+:::
+::: {.column width="50%"}
+- Unlike department codes, these numbers **do** have an order
+- But is the distance from 1 to 2 the same as from 4 to 5?
+- **Nobody knows.** So there is more than one reasonable way to store the item
+:::
+::::
+
+## Three Ways to Store a Likert Item
+
+| Store it as | Assumes | Common use |
+|-------------|---------|------------|
+| Numeric (1 to 5) | Equal spacing | Averaging items into a scale score |
+| Ordered factor | Order, unknown spacing | Sorting, tables, plots, ordinal models |
+| Unordered factor | Separate categories | Comparing specific groups |
+
+### Key points
+- **Know which choice you made.** R will not warn you either way
+- **Multi-item scales** (e.g. averaging five items) are usually treated as numeric
+- **Ordered factors behave unexpectedly in regression** (see @sec-ordered)
+
+## Likert Items in R
+
+```{r}
+#| label: likert-example
+
+satisfaction <- c(4, 5, 2, 4, 3, 1, 5, 4)
+mean(satisfaction)          # as numeric: assumes equal spacing
+
+satisfaction_f <- factor(satisfaction, levels = 1:5,
+                         labels = c("Strongly disagree", "Disagree", "Neutral",
+                                    "Agree", "Strongly agree"),
+                         ordered = TRUE)
+satisfaction_f
+satisfaction_f >= "Agree"   # comparisons work because the order is defined
+```
+
+# Data Types {#sec-types}
+
+## The Four Basic Types {#sec-basic-types}
+
+| Type | Example | Business example |
+|------|---------|------------------|
+| Logical | `TRUE`, `FALSE` | Did the customer renew? (only two values) |
+| Integer | `5L` | Number of employees |
+| Double (numeric) | `3.14` | Revenue, profit margin |
+| Character | `"Sales"` | Customer name, survey comment |
+
+```{r}
+#| label: types-example
+
+renewed <- TRUE; employees <- 250L; revenue <- 1250000.50; dept <- "Sales"
+c(typeof(renewed), typeof(employees), typeof(revenue), typeof(dept))
+```
+
+## Special Types Built on the Basic Types {#sec-special-types}
+
+Each is a basic type with extra information attached, which R calls a **class**:
+
+| Kind of data | Class | Stored underneath as | Example |
+|--------------|-------|----------------------|---------|
+| Categorical | `factor` | Integer codes + labels | Department |
+| Date | `Date` | Days since 1970-01-01 | Hire date |
+| Date-time | `POSIXct` | Seconds since 1970-01-01 UTC | Order timestamp |
+
+```{r}
+#| label: typeof-vs-class
+
+typeof(department); class(department)   # stored as integers, treated as a factor
+```
+
+### Notice
+A factor is stored exactly like the department codes: integers plus a dictionary of labels. The difference is that R now *knows* they are codes.
+
+## Dates
+
+```{r}
+#| label: dates
+
+hire_date <- as.Date("2021-09-23")              # ISO format: year-month-day
+as.Date("09/23/2021", format = "%m/%d/%Y")      # other formats need a format string
+
+# lubridate: name the order of the parts
+ymd("2021-09-23"); mdy("09/23/2021"); dmy("23.09.2021")
+
+as_of <- as.Date("2026-11-04")
+as_of - hire_date                                # tenure in days
+year(hire_date); month(hire_date, label = TRUE)
+```
+
+## Date-Times (`POSIXct`)
+
+A date-time stores a moment down to the second, so it also needs a **time zone**.
+
+```{r}
+#| label: datetimes
+
+order_time <- ymd_hms("2026-11-04 12:38:00", tz = "America/New_York")
+class(order_time); typeof(order_time)
+hour(order_time); wday(order_time, label = TRUE)
+
+ship_time <- ymd_hms("2026-11-05 09:15:00", tz = "America/New_York")
+difftime(ship_time, order_time, units = "hours")
+with_tz(order_time, tzone = "Asia/Seoul")        # same moment, another zone
+```
+
+## Time Zones
+
+### Watch out {.alert}
+If you do not set `tz`, R uses your computer's time zone. The same code can give different results on different computers.
+
+- Base R equivalent: `as.POSIXct("2026-11-04 12:38:00", tz = "America/New_York")`
+- Survey platforms such as Qualtrics often export timestamps in UTC or in the survey owner's time zone
+- Check the documentation and **set `tz` explicitly**
+
+## Checking and Converting Types {#sec-convert}
+
+- `is.*()` functions **check** a type; `as.*()` functions **convert** to a type
+
+```{r}
+#| label: convert-example
+
+is.numeric(revenue); is.character(revenue)
+as.character(revenue); as.numeric("42")
+```
+
+- When a conversion is impossible, R returns `NA` **with a warning**:
+
+```{r}
+#| label: convert-warning
+
+as.numeric(c("100", "250", "N/A", "$1,200"))
+```
+
+### Excel users {.example}
+A column that *looks* numeric in Excel often arrives in R as character because a few cells contain text, commas, or currency symbols.
+
+## Missing Values {#sec-na}
+
+`NA` means "not available." Most calculations involving `NA` return `NA`.
+
+```{r}
+#| label: na-example
+
+scores <- c(4, 5, NA, 3, 5)
+
+mean(scores)                 # NA: R refuses to guess
+mean(scores, na.rm = TRUE)   # ignore missing values
+is.na(scores)                # which values are missing?
+sum(is.na(scores))           # how many?
+```
+
+- `scores == NA` does **not** work. Always use `is.na()`
+
+# Factors {#sec-factors}
+
+## What Is a Factor?
+
+A **factor** stores a categorical variable with a fixed set of **levels**.
+
+```{r}
+#| label: factor-example
+
+region <- c("South", "North", "West", "South", "North", "South")
+region_f <- factor(region)
+
+region_f
+levels(region_f)        # sorted alphabetically by default
+table(region_f)
+```
+
+- For numeric codes, apply the data dictionary with `levels` and `labels` (@sec-coded)
+
+## Changing Levels with `forcats`
+
+`forcats` (part of the tidyverse): every function starts with `fct_`
+
+```{r}
+#| label: forcats-example
+
+fct_recode(region_f, "Southeast" = "South")     # rename: new = old
+
+fct_collapse(satisfaction_f,                    # merge levels
+             Disagree = c("Strongly disagree", "Disagree"),
+             Neutral  = "Neutral",
+             Agree    = c("Agree", "Strongly agree"))
+
+fct_infreq(region_f)                            # order by frequency
+```
+
+## The Reference Level: Why It Matters {#sec-reference}
+
+- The **first level** of a factor is its **reference level** (baseline)
+- In a regression, **every other level is compared to the reference**
+- So the reference level decides **what your coefficients mean** (see @sec-lm)
+- Alphabetical order is rarely the comparison you want
+
+### Choose the reference on purpose {.example}
+- The **control group** in an experiment
+- The **status quo**, e.g. "no training program"
+- The **largest** or most typical group
+- Whatever group your **hypothesis** compares against
+
+## The Reference Level: How to Set It
+
+```{r}
+#| label: relevel-example
+
+# 1. Base R: move one level to the front
+relevel(region_f, ref = "West") |> levels()
+
+# 2. Base R: set the full order yourself
+factor(region, levels = c("West", "North", "South")) |> levels()
+
+# 3. forcats: move one or more levels to the front
+fct_relevel(region_f, "West") |> levels()
+```
+
+## A Common Trap
+
+`as.numeric()` on a factor returns the **internal codes**, not the original values:
+
+```{r}
+#| label: factor-trap
+
+year_f <- factor(c(2022, 2024, 2023, 2024))
+
+as.numeric(year_f)                 # 1 3 2 3 -- wrong!
+as.numeric(as.character(year_f))   # 2022 2024 2023 2024 -- right
+```
+
+## Task 1: Apply a Data Dictionary
+
+### Task {.alert}
+A customer file stores loyalty tier as codes: 1 = Bronze, 2 = Silver, 3 = Gold.
+
+1. Convert `tier` to a factor with the correct labels
+2. Count how many customers are in each tier using `table()`
+3. Set `"Silver"` as the reference level and check with `levels()`
+4. Use `fct_collapse()` to combine Silver and Gold into `"Premium"`
+
+```{r}
+#| label: task1-starter
+#| eval: false
+
+tier <- c(3, 1, 2, 3, 1, 3, 2, 1, 1)
+# your code here
+```
+
+## Task 1: Solution
+
+```{r}
+#| label: task1-solution
+
+tier <- c(3, 1, 2, 3, 1, 3, 2, 1, 1)
+
+tier_f <- factor(tier, levels = 1:3, labels = c("Bronze", "Silver", "Gold"))
+table(tier_f)
+
+tier_f <- fct_relevel(tier_f, "Silver")
+levels(tier_f)
+
+fct_collapse(tier_f, Premium = c("Silver", "Gold"))
+```
+
+# Data Structures {#sec-structures}
+
+## R's Data Structures
+
+![](images/data_structures.png){width=85%}
+
+## Comparing Data Structures
+
+| Structure | Dimensions | Same type required? | Typical use |
+|-----------|------------|---------------------|-------------|
+| Vector | 1 | Yes | One variable (one column) |
+| Matrix | 2 | Yes | Numeric computation |
+| Array | 3+ | Yes | Stacks of matrices |
+| Data frame | 2 | Within each column | Your dataset |
+| List | 1 | No: anything | Model output, collections |
+
+## Vectors
+
+A sequence of values of the **same type**. Every column in a dataset is a vector.
+
+```{r}
+#| label: vector-example
+
+sales <- c(120, 95, 143, 88, 110)
+names(sales) <- c("Mon", "Tue", "Wed", "Thu", "Fri")
+sales
+
+sales * 1.07             # works on every element: no "drag down" as in Excel
+c(1, TRUE, "Sales")      # mixed types: everything becomes character
+```
+
+## Subsetting a Vector {#sec-subset}
+
+![](images/vector_subsetting.png){width=85%}
+
+## Keep or Drop One Element
+
+```{r}
+#| label: subset-setup
+
+X <- c(10, 20, 30, NA, 50)
+names(X) <- c("a", "b", "c", "d", "e")
+```
+
+:::: {.columns}
+::: {.column width="50%"}
+**Keep** the third element
+
+```{r}
+#| label: subset-keep
+
+X[3]
+X["c"]
+X[c(FALSE, FALSE, TRUE, FALSE, FALSE)]
+```
+:::
+::: {.column width="50%"}
+**Drop** the third element
+
+```{r}
+#| label: subset-drop
+
+X[-3]
+X[names(X) != "c"]
+X[!c(FALSE, FALSE, TRUE, FALSE, FALSE)]
+```
+:::
+::::
+
+## Drop Missing Values
+
+All five return the elements that are not `NA`:
+
+```{r}
+#| label: subset-na
+
+X[which(!is.na(X))]          # indexes of non-missing values
+X[names(X)[!is.na(X)]]       # names of non-missing values
+X[is.na(X) == FALSE]         # logical vector
+X[complete.cases(X)]         # logical vector from complete.cases()
+na.omit(X)                   # also records which were removed
+```
+
+## Subset by Condition
+
+The version you will use most: the logical vector is built from the data itself.
+
+```{r}
+#| label: subset-condition
+
+sales[sales > 100]
+sales[sales > 100 & sales < 130]
+```
+
+### `TRUE`/`FALSE` vs. `T`/`F` {.example}
+`T` and `F` work as shortcuts, but they are ordinary variable names that can be overwritten (e.g. `T <- 0`). Spell them out in code you share.
+
+## Matrices and Arrays
+
+:::: {.columns}
+::: {.column width="50%"}
+**Matrix**: 2 dimensions, one type
+
+```{r}
+#| label: matrix-example
+
+m <- matrix(1:6, nrow = 2)
+m
+m[2, 3]     # row 2, column 3
+m[1, ]      # all of row 1
+```
+:::
+::: {.column width="50%"}
+**Array**: 3+ dimensions, one type
+
+```{r}
+#| label: array-example
+
+a <- array(1:24, dim = c(2, 3, 4))
+dim(a)
+a[, , 1]     # first layer
+a[1, 2, 3]   # row 1, col 2, layer 3
+```
+:::
+::::
+
+## Data Frames {#sec-dataframes}
+
+Looks like a matrix, but is a set of **equal-length vectors**: one type per column.
+
+```{r}
+#| label: df-example
+
+employees <- data.frame(
+  id           = 1:6,
+  department   = c("Sales", "HR", "IT", "Sales", "IT", "HR"),
+  tenure_years = c(3.5, 10, 1.2, 7, NA, 4.8),
+  remote       = c(TRUE, FALSE, TRUE, TRUE, FALSE, FALSE),
+  hire_date    = ymd(c("2023-05-01", "2016-11-14", "2025-08-20",
+                       "2019-11-04", "2026-01-12", "2022-01-03"))
+)
+str(employees)
+```
+
+## Subsetting a Data Frame
+
+`data[rows, columns]`: a blank side means "all"
+
+```{r}
+#| label: df-subset
+
+employees$department                    # one column as a vector
+employees[employees$remote, ]           # rows where remote is TRUE
+employees[, c("id", "tenure_years")]    # selected columns
+```
+
+## Modifying a Data Frame
+
+```{r}
+#| label: df-modify
+
+employees$department <- factor(employees$department)  # convert to factor
+employees$senior <- employees$tenure_years >= 5       # add a new column
+```
+
+Preview of `dplyr` (Sessions 4 and 5): the same ideas, read like sentences
+
+```{r}
+#| label: df-dplyr-preview
+
+employees |>
+  filter(remote) |>
+  select(id, department, senior)
+```
+
+- Tidyverse functions often return a **tibble**: a modern data frame that prints more neatly
+
+## Lists
+
+One-dimensional like a vector, but each element can be **anything**.
+
+```{r}
+#| label: list-example
+
+firm <- list(
+  name      = "Acme Corp",
+  founded   = 1998L,
+  divisions = c("Retail", "Wholesale", "Online"),
+  staff     = employees
+)
+
+str(firm, max.level = 1)
+firm$divisions; firm[["founded"]]
+```
+
+# Factors in a Regression Model {#sec-lm}
+
+## The `Salaries` Data
+
+- 2008–09 nine-month salaries of 397 professors at a US university (package `carData`)
+- You know regression already. Here we only **read the coefficients**
+
+```{r}
+#| label: salaries-data
+
+str(Salaries)
+```
+
+## Average Salary by Rank
+
+```{r}
+#| label: salaries-means
+
+Salaries |>
+  group_by(rank) |>
+  summarise(n = n(), mean_salary = mean(salary))
+
+group_means <- tapply(Salaries$salary, Salaries$rank, mean)   # base R version
+```
+
+## Reference Coding (R's Default) {#sec-ref-coding}
+
+```{r}
+#| label: lm-reference
+
+m_ref <- lm(salary ~ rank, data = Salaries)
+summary(m_ref)
+```
+
+## What R Built Behind the Scenes
+
+R turned `rank` into **two** dummy (0/1) columns: one per level except the reference.
+
+```{r}
+#| label: model-matrix
+
+model.matrix(m_ref) |> head()
+```
+
+## Reading the Coefficients
+
+- **`(Intercept)`** = `r dollars(coef(m_ref)[1])`: the average salary of the reference level, **`r levels(Salaries$rank)[1]`**
+- **`r names(coef(m_ref))[2]`** = `r dollars(coef(m_ref)[2])`: how much more `r levels(Salaries$rank)[2]` professors earn **than `r levels(Salaries$rank)[1]`**
+- **`r names(coef(m_ref))[3]`** = `r dollars(coef(m_ref)[3])`: how much more `r levels(Salaries$rank)[3]` professors earn **than `r levels(Salaries$rank)[1]`**
+
+### Key idea {.example}
+Each coefficient is a **difference from the reference level**. Its p-value tests whether that difference is zero.
+
+## Changing the Reference Level
+
+Research question: how much less do junior faculty earn than **full professors**?
+
+```{r}
+#| label: lm-relevel
+
+Salaries$rank_prof <- fct_relevel(Salaries$rank, "Prof")
+m_ref2 <- lm(salary ~ rank_prof, data = Salaries)
+coef(m_ref2)
+
+all.equal(fitted(m_ref), fitted(m_ref2))   # identical predictions
+```
+
+- Every coefficient changed, but the **model did not**
+- The reference level changes *the question the coefficients answer*, not the fit
+
+## One-Hot Coding (No Intercept) {#sec-onehot}
+
+One 0/1 column for **every** level. Remove the intercept with `0 +`:
+
+```{r}
+#| label: lm-onehot
+
+m_onehot <- lm(salary ~ 0 + rank, data = Salaries)
+coef(m_onehot)
+model.matrix(m_onehot) |> head(3)
+```
+
+- No intercept; each coefficient is simply **the average salary of that rank**
+
+## Same Information, Different Numbers
+
+```{r}
+#| label: coding-comparison
+
+data.frame(group_mean       = group_means,
+           reference_coding = coef(m_ref),
+           one_hot          = coef(m_onehot))
+
+all.equal(fitted(m_ref), fitted(m_onehot))
+```
+
+- Reference coding: `r levels(Salaries$rank)[2]` average = `r dollars(coef(m_ref)[1])` + `r dollars(coef(m_ref)[2])` = `r dollars(coef(m_ref)[1] + coef(m_ref)[2])`
+
+## Reference Coding vs. One-Hot Coding
+
+| | Reference coding | One-hot coding |
+|---|---|---|
+| Formula | `salary ~ rank` | `salary ~ 0 + rank` |
+| Dummy columns | One per level, minus the reference | One per level |
+| Intercept | Mean of the reference level | None |
+| Coefficients | Differences from the reference | Group means |
+| p-values test | Different from the reference? | Is the mean zero? (rarely useful) |
+| Fitted values | Same | Same |
+
+### Don't compare R² across these models {.alert}
+Without an intercept, `summary()` computes R² differently, so it looks much higher even though the fit is identical.
+
+## Ordered Factors in a Regression {#sec-ordered}
+
+- `diamonds` (from `ggplot2`): prices and attributes of about 54,000 diamonds
+- Regressing price on product attributes is a **hedonic pricing model**, a standard method in marketing and economics
+- `cut` is an **ordered** factor:
+
+```{r}
+#| label: diamonds-data
+
+class(diamonds$cut)
+levels(diamonds$cut)
+```
+
+## Polynomial Contrasts
+
+```{r}
+#| label: lm-ordered
+
+m_ordered <- lm(price ~ cut, data = diamonds)
+coef(m_ordered)
+```
+
+- `cut.L`, `cut.Q`, `cut.C`, `cut^4`: **linear, quadratic, cubic, and fourth-power trends** across the ordered levels
+- A valid coding, but **not** "difference from the reference"
+
+## Back to Reference Coding
+
+```{r}
+#| label: lm-unordered
+
+diamonds$cut_unordered <- factor(diamonds$cut, ordered = FALSE)
+m_unordered <- lm(price ~ cut_unordered, data = diamonds)
+coef(m_unordered)
+all.equal(fitted(m_ordered), fitted(m_unordered))   # same predictions again
+```
+
+### Ordered factors and your survey data {.alert}
+Likert items stored as ordered factors (@sec-likert) get polynomial contrasts. Unless you want trend tests, convert them to unordered factors or keep them numeric before modeling.
+
+## A Puzzle for Later
+
+- On average, `Ideal` diamonds are *cheaper* than `Fair` ones. Better cut, lower price?
+- Diamond size (`carat`) is missing from the model, and ideal-cut diamonds tend to be smaller
+- This is **omitted variable bias**, which your statistics course will cover
+
+## The Model Is a List
+
+A fitted model is one of our data structures: a **list**.
+
+```{r}
+#| label: model-is-list
+
+is.list(m_ref)
+names(m_ref)
+m_ref$coefficients
+```
+
+- This is why `$` works on model objects
+
+# Your Turn {#sec-your-turn}
+
+## Exercise
+
+### Data dictionary {.example}
+`region`: 1 = East, 2 = South, 3 = West \
+`satisfaction`: 1 = Very dissatisfied, 2 = Dissatisfied, 3 = Neutral, 4 = Satisfied, 5 = Very satisfied
+
+1. Check every column's type with `str()`. Which are stored in a way that does not match their meaning?
+2. Convert `region` to a factor using the dictionary, with `"South"` as the reference level
+3. Convert `annual_spend` to numeric. What happens to `"unknown"`? Count the missing values and compute the average spend
+4. Create `satisfaction_f`, an ordered factor version of `satisfaction`. Keep the numeric column too
+5. Convert `signup_date` to a Date and compute tenure in days as of `2026-11-04`
+6. Keep only customers who renewed; show just `customer` and `annual_spend`
+
+## Exercise Data
+
+```{r}
+#| label: exercise-data
+
+survey <- data.frame(
+  customer     = c("C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08"),
+  region       = c(3, 1, 2, 1, 3, 2, 2, 1),
+  annual_spend = c("1200", "850", "unknown", "2300", "1750", "640", "990", "1480"),
+  satisfaction = c(5, 2, 3, 4, 4, 1, 3, 5),
+  signup_date  = c("03/15/2022", "11/02/2024", "07/30/2019", "01/09/2025",
+                   "06/21/2021", "09/14/2023", "12/01/2020", "04/18/2026"),
+  renewed      = c(TRUE, FALSE, TRUE, TRUE, FALSE, TRUE, FALSE, TRUE)
+)
+```
+
+## Exercise: Solution (1–3)
+
+```{r}
+#| label: exercise-solution-1
+#| warning: false
+
+# 1. region and satisfaction are codes stored as numbers;
+#    annual_spend and signup_date are stored as character
+
+# 2.
+survey$region <- factor(survey$region, levels = 1:3,
+                        labels = c("East", "South", "West"))
+survey$region <- fct_relevel(survey$region, "South")
+levels(survey$region)
+
+# 3. "unknown" becomes NA (with a warning)
+survey$annual_spend <- as.numeric(survey$annual_spend)
+sum(is.na(survey$annual_spend))
+mean(survey$annual_spend, na.rm = TRUE)
+```
+
+## Exercise: Solution (4–6)
+
+```{r}
+#| label: exercise-solution-2
+
+# 4.
+survey$satisfaction_f <- factor(survey$satisfaction, levels = 1:5,
+                                labels = c("Very dissatisfied", "Dissatisfied",
+                                           "Neutral", "Satisfied", "Very satisfied"),
+                                ordered = TRUE)
+# 5.
+survey$signup_date <- mdy(survey$signup_date)
+survey$tenure_days <- as.numeric(as.Date("2026-11-04") - survey$signup_date)
+
+# 6.
+survey[survey$renewed, c("customer", "annual_spend")]
+```
+
+## Bonus: Reference Levels in a Model
+
+### Task {.alert}
+Using the `Salaries` data:
+
+1. Fit `lm(salary ~ discipline, data = Salaries)`. Which discipline is the reference level, and what does the coefficient mean?
+2. Make the other discipline the reference and refit. What changed, and what stayed the same?
+3. Fit the one-hot version and check that its coefficients equal the group means
+
+## Bonus: Solution
+
+```{r}
+#| label: bonus-solution
+
+m1 <- lm(salary ~ discipline, data = Salaries)
+coef(m1)    # intercept = mean of A; coefficient = B minus A
+
+m2 <- lm(salary ~ fct_relevel(discipline, "B"), data = Salaries)
+coef(m2)    # intercept = mean of B; coefficient = A minus B
+all.equal(fitted(m1), fitted(m2))
+
+m3 <- lm(salary ~ 0 + discipline, data = Salaries)
+coef(m3)
+tapply(Salaries$salary, Salaries$discipline, mean)
+```
+
+# Summary {#sec-summary}
+
+## Key Takeaways
+
+- How a variable is stored decides how R treats it: convert numeric codes to factors with the data dictionary, and make a deliberate choice for Likert items
+- Four basic types; factors, Dates, and date-times are built on top of them. `typeof()` shows storage, `class()` shows behavior
+- Use `is.na()` to find missing values and `na.rm = TRUE` to ignore them
+- The reference level determines what regression coefficients mean: set it with `relevel()`, `factor(levels = )`, or `fct_relevel()`
+- Reference and one-hot coding give different coefficients but identical predictions; ordered factors use polynomial contrasts
+- Vectors, matrices, and arrays hold one type; data frames hold one type per column; lists hold anything
+
+## Next Session and Further Reading
+
+**Next session:** importing real-world data from CSV, Excel, SPSS, and Stata files
+
+**Further reading**
+
+- R for Data Science (2e): [Factors](https://r4ds.hadley.nz/factors.html)
+- R for Data Science (2e): [Dates and times](https://r4ds.hadley.nz/datetimes.html)
+- Quarto: [Beamer presentations](https://quarto.org/docs/presentations/beamer.html)
