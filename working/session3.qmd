@@ -12,6 +12,9 @@ format:
     code-copy: true
     code-tools: true
     embed-resources: true
+    grid:
+      body-width: 1100px   # main text column (Quarto default: 800px)
+      margin-width: 150px  # right margin, unused here (default: 250px)
 execute:
   echo: true
   warning: true
@@ -21,9 +24,9 @@ execute:
 HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
 - Companion slides: session3-slides.qmd
 - Chunks with `#| error: true` deliberately produce an error; rendering continues.
-- The "Handling Errors" section writes three small CSV files to data/survey_waves/
-  when it renders (one deliberately empty). This is intentional.
 - Requires: tidyverse, here (both on the Session 1 install list).
+- Input checks (stopifnot/stop/warning) and tryCatch() moved to the
+  "Error handling" elective.
 -->
 
 ::: {.callout-note}
@@ -33,11 +36,10 @@ By the end of this session, you will be able to:
 
 1. Use R's arithmetic, comparison, and logical operators, and know that they work on whole vectors
 2. Call functions using named and positional arguments, and read a help page to find out how
-3. Write your own functions, with default arguments and checks on their inputs
+3. Explain what a function is, and write your own with default arguments
 4. Make decisions in code with `if`/`else`, `if_else()`, and `case_when()`
 5. Repeat tasks with `for` loops and with `purrr::map()`, and know when you do not need a loop
-6. Chain steps together with the pipe `|>`
-7. Keep a loop running when one step fails, using `tryCatch()`
+6. Chain functions together with the pipe `|>`, including its placeholder `_`
 :::
 
 **Before you start:** open your workshop RStudio Project and run the setup chunk.
@@ -285,7 +287,42 @@ mean(survey$eng2, na.rm = TRUE)
 
 # Writing Functions {#sec-writing-functions}
 
-## Why Write a Function? {#sec-why-functions}
+## What Is a Function? {#sec-what-function}
+
+Think of an espresso machine. When you press the button with the **two-cup symbol**, the machine grinds the beans, heats the water, extracts espresso at 20 bar, and pours it into the cup. You do not do any of those steps yourself, and you do not need to know how the pump works. One press runs the **same steps, in the same order, the same way**, and you get two shots of espresso of the same quality every time.
+
+That button is a **function**: a named, reusable procedure that turns inputs into an output.
+
+| Espresso machine | Function in R |
+|------------------|---------------|
+| The two-cup button | The function's **name** |
+| Your choices: number of cups, strength | **Arguments** (the inputs) |
+| The usual strength if you do not choose one | **Default** arguments |
+| Grind, heat, extract at 20 bar, pour | The **body**: the steps the function runs |
+| Two shots of espresso | The **return value** (the output) |
+| Same steps and same quality every time | **Reproducible** results |
+| No need to know how the pump works | You can use `mean()` without reading its code |
+
+You have been pressing other people's buttons all along: `mean()`, `round()`, `factor()`. In this section you build your own.
+
+## The Syntax {#sec-syntax}
+
+Every function you write follows the same template:
+
+```r
+function_name <- function(arg1, arg2) {
+  # the body: steps that use arg1 and arg2
+  output <- ...
+  return(output)
+}
+```
+
+- `function_name <-` stores the function under a name, just like any other object
+- `function(arg1, arg2)` lists the arguments: the inputs the function needs
+- The **body**, between `{ }`, holds the steps
+- `return(output)` sends the result back to whoever called the function
+
+## Why Write Your Own? {#sec-why-functions}
 
 Suppose you reverse-code the two reverse-worded items by copying and pasting:
 
@@ -297,18 +334,18 @@ survey$eng3 <- 6 - survey$eng3
 survey$eng5 <- 6 - survey$eng3     # copied the line above... and forgot to change eng3
 ```
 
-The second line contains a bug that is easy to miss: it overwrites `eng5` with the reversed `eng3`. Copying and pasting code invites exactly this kind of mistake, and if the scale ever changes (say, to 7 points), you have to find and fix every copy.
+The second line contains a bug that is easy to miss: it overwrites `eng5` with the reversed `eng3`. Copying and pasting code invites exactly this kind of mistake, and if the scale ever changes (say, to 7 points), you have to find and fix every copy. A function is like building the button once: the steps are written in one place, and every press follows them exactly.
 
 **Rule of thumb:** once you have copied the same code **three times**, write a function.
 
-## Anatomy of a Function {#sec-anatomy}
+## A First Function {#sec-anatomy}
 
 ```{r}
 #| label: anatomy
 
 profit_margin <- function(revenue, cost) {
   margin <- (revenue - cost) / revenue
-  margin                               # the last value is returned
+  return(margin)
 }
 
 profit_margin(125000, 98000)
@@ -319,20 +356,26 @@ profit_margin(quarterly_revenue, quarterly_cost)   # works on vectors too
 |------|----------------|
 | Name | `profit_margin` |
 | Arguments | `revenue`, `cost` |
-| Body, between `{ }` | The code that does the work |
-| Return value | The last line evaluated, here `margin`. You can also write `return(margin)` |
+| Body, between `{ }` | `margin <- (revenue - cost) / revenue` |
+| Return value | `return(margin)` |
 
-Objects created **inside** a function, such as `margin`, exist only while the function runs. They do not appear in your Environment and do not overwrite objects with the same name outside it.
+Objects created **inside** a function, such as `margin`, exist only while the function runs. They do not appear in your Environment and do not overwrite objects with the same name outside it, just as the machine's internal water tank is not the cup you drink from.
+
+::: {.callout-note}
+## Functions without `return()`
+If a function has no `return()`, R returns the value of the **last line** of the body. You will often see this shortcut in other people's code, e.g. a body that ends with just `margin`. In this course we write `return()` so the output is always obvious.
+:::
 
 ## Default Arguments {#sec-defaults}
 
-Our first version of `reverse_code()`:
+Like the machine's usual strength setting, a **default** is the value an argument takes when you do not choose one. Our function for reverse-coding Likert items:
 
 ```{r}
-#| label: reverse-v1
+#| label: reverse-code
 
 reverse_code <- function(x, scale_min = 1, scale_max = 5) {
-  (scale_max + scale_min) - x
+  reversed <- (scale_max + scale_min) - x
+  return(reversed)
 }
 
 reverse_code(survey$eng3)                  # uses the defaults: a 1-to-5 scale
@@ -341,54 +384,18 @@ reverse_code(c(1, 4, 7), scale_max = 7)    # a 7-point scale
 
 Why `(scale_max + scale_min) - x`? On a 1-to-5 scale it is `6 - x`; on a 1-to-7 scale it is `8 - x`; and it also works for scales that start at 0. Writing the general rule once means you never have to think about it again.
 
-## Checking Inputs {#sec-checks}
-
-What happens if someone gives the function bad input?
-
-```{r}
-#| label: bad-input
-
-reverse_code(c(1, 3, 99))                  # 99 = "Prefer not to answer"
-```
-
-R returns `-93` without complaint, and that value would silently distort a scale average. A good function **checks its inputs** and stops with a clear message:
+::: {.callout-warning}
+## Recode missing-value codes first
+Survey platforms often code "Prefer not to answer" as a number such as `99`. A function does exactly what it was built to do, nothing more, so it will happily reverse-code that `99`:
 
 ```{r}
-#| label: reverse-v2
-
-reverse_code <- function(x, scale_min = 1, scale_max = 5) {
-  stopifnot(is.numeric(x))                       # stop if x is not numeric
-
-  out_of_range <- !is.na(x) & (x < scale_min | x > scale_max)
-  if (any(out_of_range)) {
-    stop("Found values outside ", scale_min, " to ", scale_max, ": ",
-         paste(unique(x[out_of_range]), collapse = ", "),
-         ". Recode missing-value codes to NA first.")
-  }
-
-  (scale_max + scale_min) - x
-}
-```
-
-```{r}
-#| label: reverse-v2-errors
-#| error: true
+#| label: missing-code-warning
 
 reverse_code(c(1, 3, 99))
-reverse_code(c("Agree", "Disagree"))
 ```
 
-```{r}
-#| label: reverse-v2-ok
-
-reverse_code(c(1, 3, NA, 5))               # NA is allowed and stays NA
-```
-
-| Function | Use it to |
-|----------|-----------|
-| `stopifnot(condition)` | Stop if a condition is not `TRUE`. Quick, with an automatic message |
-| `stop("message")` | Stop with your own, more helpful message |
-| `warning("message")` | Continue, but warn the user |
+The `-93` would silently pull down any average it goes into. Always replace missing-value codes with `NA` **before** reverse-coding or averaging. You will do this in the exercise (@sec-your-turn).
+:::
 
 # Making Decisions {#sec-decisions}
 
@@ -422,7 +429,7 @@ if (response_rate >= 0.5) {
 }
 ```
 
-`if` is for decisions about **one thing**: whether to run a step, which file to read, whether an input is valid (as in `reverse_code()`). Giving it a whole vector is an error:
+`if` is for decisions about **one thing**: whether to run a step, which file to read, whether to send a survey reminder. Giving it a whole vector is an error:
 
 ```{r}
 #| label: if-vector-error
@@ -496,15 +503,17 @@ Put the most specific conditions first: in the tenure example, `< 2` must come b
 #| label: switch
 
 summarize_item <- function(x, stat = "mean") {
-  switch(stat,
-         mean   = mean(x, na.rm = TRUE),
-         median = median(x, na.rm = TRUE),
-         agree  = mean(x >= 4, na.rm = TRUE),   # proportion who agree
-         stop("Unknown stat: ", stat))          # anything else
+  result <- switch(stat,
+                   mean   = mean(x, na.rm = TRUE),
+                   median = median(x, na.rm = TRUE),
+                   agree  = mean(x >= 4, na.rm = TRUE),   # proportion who agree
+                   NA)                                    # anything else
+  return(result)
 }
 
 summarize_item(survey$eng1)
 summarize_item(survey$eng1, stat = "agree")
+summarize_item(survey$eng1, stat = "mode")      # not an option: NA
 ```
 
 # Loops {#sec-loops}
@@ -667,23 +676,60 @@ Both are fine. A `for` loop is often easier to write and debug when you are star
 
 # The Pipe `|>` {#sec-pipe}
 
-Code often applies several functions in a row. Written the usual way, the functions are **nested**, and you have to read them from the inside out:
+## Functions as Mappings {#sec-mapping}
+
+In mathematics, a function $f: A \to B$ **maps** each input in $A$ to an output in $B$. For example, $f(x) = 2x$ takes any number $x$ and maps it to $2x$, and $g(x) = x + 1$ adds one. Written as R functions:
+
+```{r}
+#| label: f-and-g
+
+f <- function(x) {
+  return(2 * x)
+}
+
+g <- function(x) {
+  return(x + 1)
+}
+
+f(3)
+g(3)
+```
+
+## Chaining Functions {#sec-composition}
+
+Feeding the output of one function into another is called **composition**. "Double 3, then add 1" is $g(f(3))$, also written $(g \circ f)(3)$:
+
+```{r}
+#| label: composition
+
+g(f(3))
+```
+
+Notice the order: `f` runs **first**, but `g` is written first. Nested code is read **from the inside out**, which becomes hard to follow as chains get longer:
 
 ```{r}
 #| label: nested
 
-round(mean(survey_scored$engagement), 2)
+round(mean(survey_scored$engagement), 2)    # mean first, then round
 ```
 
-The **pipe** `|>` passes the result of one step into the next, so code reads from left to right, like a recipe:
+The **pipe** `|>` writes the same chain in the order the steps happen, **from left to right**:
 
 ```{r}
-#| label: pipe
+#| label: pipe-basic
 
-survey_scored$engagement |> mean() |> round(2)
+3 |> f() |> g()                              # same as g(f(3))
+
+survey_scored$engagement |> mean() |> round(2)   # same as round(mean(...), 2)
 ```
 
-Read `|>` as **"and then."** The value on the left becomes the **first argument** of the function on the right: `x |> f(y)` is the same as `f(x, y)`. Pipes are most useful in longer chains, written one step per line:
+| Nested | Piped |
+|--------|-------|
+| `f(x)` | `x |> f()` |
+| `g(f(x))` | `x |> f() |> g()` |
+| `f(x, y)` | `x |> f(y)` |
+
+The result is **exactly the same**. The only difference is **readability**: read `|>` as **"and then."** The value on the left always goes into the **first argument** of the function on the right. Longer chains are written one step per line:
 
 ```{r}
 #| label: pipe-chain
@@ -693,96 +739,63 @@ survey_scored |>
   nrow()
 ```
 
-To pass the value to an argument other than the first, use the placeholder `_` with the argument's name:
+## The Placeholder `_`: Piping into Another Argument {#sec-placeholder}
+
+Sometimes the value you are piping is **not** the function's first argument. Consider a function that grows an amount at a given rate, with `rate` as its first argument:
 
 ```{r}
-#| label: pipe-placeholder
+#| label: grow
+
+grow <- function(rate, principal, years = 1) {
+  return(principal * (1 + rate)^years)
+}
+
+grow(0.07, principal = 1000, years = 10)
+```
+
+Piping `1000` into `grow()` would put it in the **first** argument, `rate`, which is wrong. The placeholder `_` marks where the value should go instead. It must be used **with the argument's name**:
+
+```{r}
+#| label: placeholder
+
+1000 |> grow(0.07, principal = _, years = 10)   # same as grow(0.07, principal = 1000, years = 10)
+```
+
+In general, `x |> f(y, arg = _)` is the same as `f(y, arg = x)`. The most common use is model functions, whose first argument is the formula and whose data comes second:
+
+```{r}
+#| label: pipe-placeholder-lm
 
 survey_scored |>
   lm(engagement ~ tenure_years, data = _) |>
   coef()
 ```
 
-::: {.callout-note}
-## `|>` and `%>%`
-You will see two pipes in R code. `%>%` comes from the `magrittr` package and was the standard for years; `|>` has been built into R since version 4.1. They work almost the same way. This course uses `|>`, but read `%>%` the same way. One difference: the placeholder for `%>%` is `.` rather than `_`.
+::: {.callout-warning}
+## `_` needs an argument name
+`x |> f(y, _)` is a syntax error. Write `x |> f(y, arg = _)`.
 :::
+
+## `|>` and `%>%` {#sec-magrittr}
+
+You will see two pipes in R code. `%>%` comes from the `magrittr` package (loaded with the tidyverse) and was the standard for years; `|>` has been built into R since version 4.1. They work almost the same way, and this course uses `|>`. The differences matter mostly when you read older code:
+
+| | `%>%` (magrittr) | `|>` (base R) |
+|---|---|---|
+| Needs a package | Yes (loaded with the tidyverse) | No |
+| Placeholder | `.` | `_` |
+| Placeholder without an argument name | Allowed: `x %>% f(y, .)` | Not allowed: `x |> f(y, arg = _)` |
+| Placeholder used more than once | Allowed | Not allowed |
+| Parentheses after the function name | Optional: `x %>% f` | Required: `x |> f()` |
+
+```{r}
+#| label: magrittr-compare
+
+1000 %>% grow(0.07, ., years = 10)              # magrittr: unnamed . works
+1000 |> grow(0.07, principal = _, years = 10)   # base R: _ must be named
+```
 
 The pipe is at the heart of the `dplyr` sessions to come.
-
-# Handling Errors in Loops {#sec-errors}
-
-## Reading Errors from Your Own Functions {#sec-own-errors}
-
-When an error happens inside a function, the message tells you which function call failed:
-
-```{r}
-#| label: own-error
-#| error: true
-
-reverse_code(survey$department)
-```
-
-`is.numeric(x) is not TRUE` comes from the `stopifnot()` check, and `reverse_code(survey$department)` is the call that caused it. Clear checks like this are why it pays to write them.
-
-## Keeping a Loop Running with `tryCatch()` {#sec-trycatch}
-
-Suppose the survey was run in three waves, each exported to its own CSV file, and one export failed and produced an empty file. First, create the files (in a real project they would already exist):
-
-```{r}
-#| label: make-wave-files
-
-wave_dir <- here("data", "survey_waves")
-dir.create(wave_dir, recursive = TRUE, showWarnings = FALSE)
-
-write.csv(survey[1:3, ], file.path(wave_dir, "wave1.csv"), row.names = FALSE)
-file.create(file.path(wave_dir, "wave2.csv"))          # an empty, broken file
-write.csv(survey[4:6, ], file.path(wave_dir, "wave3.csv"), row.names = FALSE)
-
-wave_files <- list.files(wave_dir, pattern = "\\.csv$", full.names = TRUE)
-basename(wave_files)
-```
-
-A plain loop stops at the first error, so `wave3.csv` is never read, even though nothing is wrong with it:
-
-```{r}
-#| label: loop-stops
-#| error: true
-
-waves <- list()
-for (f in wave_files) {
-  waves[[basename(f)]] <- read.csv(f)
-}
-names(waves)
-```
-
-`tryCatch()` runs some code and says what to do **if an error happens**, instead of stopping. Here we print a message and return `NULL`, which leaves that file out of the list:
-
-```{r}
-#| label: trycatch
-
-waves <- list()
-
-for (f in wave_files) {
-  waves[[basename(f)]] <- tryCatch(
-    read.csv(f),
-    error = function(e) {
-      message("Skipping ", basename(f), ": ", conditionMessage(e))
-      NULL
-    }
-  )
-}
-
-names(waves)                                 # wave2.csv was skipped
-bind_rows(waves, .id = "wave")               # combine the waves that worked
-```
-
-The message names the file and the reason, so the problem is reported rather than hidden.
-
-::: {.callout-important}
-## Skip, but never silently
-`tryCatch()` should not hide problems. Always print or record what was skipped and why, and check it before you analyze the data. A wave that quietly went missing could change your results.
-:::
 
 # Your Turn {#sec-your-turn}
 
@@ -796,7 +809,7 @@ A 7-point job-satisfaction scale (1 = Strongly disagree, 7 = Strongly agree) has
 4. Use `map_dbl()` to compute the mean of each item, ignoring missing values.
 5. Create `satisfaction`, each respondent's average across the four items, using `rowMeans()`.
 6. Use `case_when()` to create `satisfaction_level`: below 3 is `"Low"`, 3 to below 5 is `"Medium"`, and 5 or above is `"High"`.
-7. **Bonus:** what happens if you run step 3 *before* step 2? Why is that a good thing?
+7. **Bonus:** run step 3 *before* step 2 on a fresh copy of the data. What happens to the `99` values, and how does it change `satisfaction`?
 :::
 
 ```{r}
@@ -841,7 +854,7 @@ js <- data.frame(
 # 1.
 clean_missing <- function(x, missing_code = 99) {
   x[x %in% missing_code] <- NA
-  x
+  return(x)
 }
 
 # 2.
@@ -872,7 +885,7 @@ js$satisfaction_level <- case_when(
 js
 ```
 
-**Bonus:** `reverse_code()` stops with an error, because `99` is outside 1 to 7. Without that check, `99` would have become `-91` and silently pulled down the respondent's average. The check turns a hidden data problem into a clear error message.
+**Bonus:** nothing stops you. `reverse_code()` turns each `99` into `8 - 99 = -91`, and those respondents' satisfaction scores drop far below the 1-to-7 range without any warning. Order matters: clean missing-value codes first.
 
 Using `%in%` in `clean_missing()` means it also works if a survey uses several missing codes, e.g. `clean_missing(x, missing_code = c(98, 99))`.
 :::
@@ -881,11 +894,11 @@ Using `%in%` in `clean_missing()` means it also works if a survey uses several m
 
 - **Operators work on whole vectors.** Use `&` and `|` on vectors, and `&&` and `||` only inside `if ()` (@sec-operators).
 - **Give obvious arguments by position, the rest by name**, and use the help page's Usage section to see the defaults (@sec-using-functions).
-- **Write a function once you have copied code three times.** Give it sensible defaults, and check its inputs with `stopifnot()` or `stop()` (@sec-writing-functions).
+- **A function is like a button on an espresso machine:** the same steps, the same way, every time. Write one once you have copied code three times, and give it sensible defaults (@sec-writing-functions).
+- **Recode missing-value codes such as `99` to `NA` before computing anything** (@sec-defaults).
 - **`if` decides about one value; `if_else()` and `case_when()` decide about every element** (@sec-decisions).
 - **Loop over columns, files, or models, not rows.** `map()` is a shorter alternative to a `for` loop (@sec-loops, @sec-map).
-- **Read `|>` as "and then"** (@sec-pipe).
-- **`tryCatch()` keeps a loop running when one step fails**, but always report what was skipped (@sec-errors).
+- **`x |> f() |> g()` is the same as `g(f(x))`**, written in the order the steps happen. Use `arg = _` to pipe into an argument other than the first (@sec-pipe).
 
 **Next session:** importing real-world data from CSV, Excel, SPSS, and Stata files.
 
