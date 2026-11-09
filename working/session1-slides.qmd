@@ -1,0 +1,675 @@
+---
+title: "Session 1: Setting Up R and RStudio"
+subtitle: "R Workshop for DBA Students"
+author: "Taikgun Song"
+date: today
+format:
+  beamer:
+    theme: Madrid
+    colortheme: default
+    aspectratio: 169
+    navigation: empty
+    toc: true
+    toc-title: "Outline"
+    number-sections: true
+    slide-level: 2
+    pdf-engine: xelatex
+    include-in-header:
+      text: |
+        \usepackage{etoolbox}
+        \AtBeginEnvironment{Shaded}{\scriptsize}
+        \makeatletter
+        \def\verbatim@font{\scriptsize\ttfamily}
+        \makeatother
+        \AtBeginSection[]{\begin{frame}{Outline}\tableofcontents[currentsection]\end{frame}}
+filters:
+  - small-output.lua   # smaller, gray R output (file must sit next to this one)
+execute:
+  echo: true
+  warning: true
+---
+
+<!--
+HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
+- Companion to session1.qmd (the HTML handout). Same content, condensed into slides.
+- # = section, ## = slide, ### = box ({.alert} red, {.example} green)
+- Chunks with `#| eval: false` are shown but not run (installs, setwd(), etc.).
+- Rendering creates data/ and data/sales.csv next to this file, as in the handout.
+- Needs LaTeX once: `quarto install tinytex` in the RStudio Terminal.
+- Version numbers were current on 2026-11-06.
+- images/rstudio_panes.png must exist (placeholder provided).
+-->
+
+```{r}
+#| label: setup
+#| include: false
+
+options(width = 70, useFancyQuotes = FALSE)
+```
+
+## Session Objectives
+
+By the end of this session, you will be able to:
+
+1. Install the correct versions of R and RStudio for your computer
+2. Configure RStudio so that your work is reproducible from the start
+3. Install, load, and update R packages
+4. Explain working directories and file paths, and organize work with RStudio Projects
+5. Create, find, and read files from R
+6. Render your first Quarto document
+7. Find help on your own when something goes wrong
+
+# R and RStudio {#sec-what}
+
+## R and RStudio
+
+:::: {.columns}
+::: {.column width="50%"}
+**R**
+
+- A programming language for statistics and data analysis
+- Free and open source
+- Most new statistical methods appear first as R packages
+:::
+::: {.column width="50%"}
+**RStudio**
+
+- A program that makes R easier to use
+- Script editor, file browser, plots, help: one window
+- Made by a company called Posit
+:::
+::::
+
+### R is the engine, RStudio is the dashboard {.example}
+You need both, and you install them separately. You open RStudio, and RStudio runs R for you.
+
+# Installing R and RStudio {#sec-install}
+
+## Step 1: Know Your Computer {#sec-know-computer}
+
+| Computer | How to check | What to install |
+|----------|--------------|-----------------|
+| **Windows** | Settings $\rightarrow$ System $\rightarrow$ About $\rightarrow$ System type | `x64` for almost everyone |
+| **Mac** | Apple menu $\rightarrow$ About This Mac | **Chip: Apple M...** $\rightarrow$ `arm64` \newline **Processor: Intel** $\rightarrow$ `x86_64` |
+
+### Mac users {.alert}
+- The `arm64` installer needs **macOS 14 (Sonoma) or later** (R 4.6.2, Nov 2026)
+- Do **not** install the Intel version on an Apple silicon Mac: it runs through Rosetta, is slower, and some packages fail in confusing ways
+- After installing, check in the Console: `R.version$arch` must say `"aarch64"` on Apple silicon (`"x86_64"` = Intel)
+
+## Steps 2 and 3: Install R, then RStudio
+
+**R** from CRAN: <https://cloud.r-project.org/>
+
+- **Windows:** Download R for Windows $\rightarrow$ base $\rightarrow$ run the installer, accept defaults
+- **Mac:** Download R for macOS $\rightarrow$ the `.pkg` that matches your chip
+
+**RStudio Desktop** (free): <https://posit.co/download/rstudio-desktop/>
+
+- **Windows:** run the installer
+- **Mac:** open the `.dmg`, drag RStudio into **Applications**
+
+RStudio comes with **Quarto** built in.
+
+**Alternative:** [Positron](https://positron.posit.co/), a newer editor from Posit for R and Python. This course uses RStudio.
+
+## Keep R Up to Date
+
+- A new version of R comes out every April, with bug-fix releases during the year
+- Updating = installing the new version over the old one
+- After a major update (e.g. 4.5 $\rightarrow$ 4.6), **reinstall your packages**
+
+## Special Cases
+
+**Windows on ARM** (Snapdragon "Copilot+ PCs")
+
+- Native R for Windows 11 exists, but is still **experimental**; some packages fail
+- Most reliable option: **Posit Cloud**
+
+**Compiling packages from source** (rarely needed)
+
+- Windows: **Rtools**, matching your R version
+- Mac: Command Line Tools: run `xcode-select --install` in Terminal
+- Install only if an error message tells you to
+
+```{r}
+#| label: check-build-tools
+#| eval: false
+
+install.packages("pkgbuild")              # optional check after installing them
+pkgbuild::has_build_tools(debug = TRUE)   # TRUE = ready to compile packages
+```
+
+## Posit Cloud: A Backup Option {#sec-cloud}
+
+<https://posit.cloud>: RStudio in your web browser, nothing to install
+
+Useful when:
+
+- Your **work laptop** does not allow installing software
+- You have a Windows ARM laptop or an old operating system
+- Your installation breaks and you need to keep working
+
+Free plan $\rightarrow$ **New Project $\rightarrow$ New RStudio Project** (check current usage limits)
+
+### For your own research {.example}
+A local installation is still better: faster, no usage limits, and your data stays on your computer.
+
+# A Tour of RStudio {#sec-tour}
+
+## The Four Panes
+
+![](images/rstudio_panes.png){width=75%}
+
+## What Each Pane Is For
+
+| Pane | Where | What it is for |
+|------|-------|----------------|
+| **Source** | Top left | Writing and saving scripts (`.R`) and documents (`.qmd`) |
+| **Console** | Bottom left | Where R runs code; quick, throwaway commands |
+| **Environment** | Top right | Objects currently in memory |
+| **Files / Plots / Packages / Help** | Bottom right | Files, plots, packages, help pages |
+
+### Script or Console? {.example}
+Anything you want to keep goes in a **script** or Quarto document. If it only exists in the Console, it is gone when you close RStudio.
+
+## Keyboard Shortcuts
+
+| Action | Windows | Mac |
+|--------|---------|-----|
+| Run current line or selection | `Ctrl` + `Enter` | `Cmd` + `Return` |
+| Run the whole script | `Ctrl` + `Shift` + `Enter` | `Cmd` + `Shift` + `Return` |
+| New R script | `Ctrl` + `Shift` + `N` | `Cmd` + `Shift` + `N` |
+| Comment / uncomment | `Ctrl` + `Shift` + `C` | `Cmd` + `Shift` + `C` |
+| Clear the Console | `Ctrl` + `L` | `Ctrl` + `L` |
+| Stop running code | `Esc` | `Esc` |
+| Show all shortcuts | `Alt` + `Shift` + `K` | `Option` + `Shift` + `K` |
+
+## Settings to Change on Day One {#sec-settings}
+
+**Tools $\rightarrow$ Global Options**
+
+| Location | Setting | Change to |
+|----------|---------|-----------|
+| General $\rightarrow$ Basic | Restore .RData into workspace at startup | **Unchecked** |
+| General $\rightarrow$ Basic | Save workspace to .RData on exit | **Never** |
+| Code $\rightarrow$ Saving | Default text encoding | **UTF-8** |
+
+## Why Not Save the Workspace?
+
+- By default, RStudio saves everything in memory on exit and reloads it next time
+- Then your results can depend on objects you created weeks ago and **no longer have code for**
+
+### Reproducibility {.alert}
+Your **script** should be the complete record of your analysis. If you can restart R, rerun the script, and get the same results, your work is reproducible.
+
+- Restart R any time: **Session $\rightarrow$ Restart R** (`Ctrl`/`Cmd` + `Shift` + `F10`)
+
+# R Packages {#sec-packages}
+
+## What Is a Package?
+
+- A bundle of functions, data, and documentation that someone has shared
+- More than 20,000 on CRAN alone
+- Like an app on your phone: **install** once, **open (load)** each time
+
+| Step | Function | How often |
+|------|----------|-----------|
+| Install | `install.packages("name")` | Once per computer (and after updating R) |
+| Load | `library(name)` | Every session, at the top of every script |
+
+## Installing Packages
+
+```{r}
+#| label: install-one
+#| eval: false
+
+install.packages("readxl")                       # one package (note the quotes)
+install.packages(c("readxl", "haven", "here"))   # several at once
+```
+
+Or: **Packages** pane $\rightarrow$ **Install** $\rightarrow$ type the name
+
+### If R asks a question during installation {.example}
+- *"Would you like to use a personal library instead?"* $\rightarrow$ **yes** (common on work laptops)
+- *"Do you want to install from sources the packages which need compilation?"* $\rightarrow$ **no**
+
+## The Course Install List {#sec-course-packages}
+
+```{r}
+#| label: install-course
+#| eval: false
+
+install.packages(c(
+  "tidyverse",     # data wrangling and visualization
+  "here",          # file paths that work on every computer
+  "readxl",        # read Excel files
+  "haven",         # read SPSS, Stata, and SAS files
+  "car",           # regression tools; also installs carData
+  "gtsummary",     # publication-ready summary tables
+  "modelsummary",  # publication-ready regression tables
+  "rmarkdown",     # used by Quarto to run R code
+  "quarto"         # control Quarto from R
+))
+```
+
+## Check the Installation
+
+```{r}
+#| label: check-course-packages
+
+course_pkgs <- c("tidyverse", "here", "readxl", "haven", "car",
+                 "gtsummary", "modelsummary", "rmarkdown", "quarto")
+
+sapply(course_pkgs, requireNamespace, quietly = TRUE)   # TRUE = installed
+```
+
+- `<-` stores the list under the name `course_pkgs`; Session 3 covers operators in detail
+
+- Every value should be `TRUE`
+- For any `FALSE`: run `install.packages()` again and **read the error message**
+
+## Loading Packages
+
+```{r}
+#| label: load-packages
+#| message: true
+
+library(tidyverse)
+```
+
+- **Conflicts**: `dplyr::filter()` masks `stats::filter()`, so `filter()` now means the `dplyr` version. This is normal, not an error
+
+## `package::function()` and `require()`
+
+Use one function without loading the whole package:
+
+```{r}
+#| label: double-colon
+
+here::here()
+```
+
+- `::` also shows where a function comes from
+
+**`library()` vs. `require()`**
+
+- `require()` returns `FALSE` with a warning when a package is missing
+- `library()` stops with an error: **use it in scripts**
+
+## Updating and Removing Packages
+
+```{r}
+#| label: update-packages
+#| eval: false
+
+update.packages(ask = FALSE)   # update everything (or Packages pane > Update)
+remove.packages("readxl")      # uninstall
+```
+
+- `install.packages()` installs from **CRAN**, where every package is checked
+- Packages can also come from other repositories, such as **GitHub** (in development, not checked by CRAN) or **Bioconductor** (bioinformatics), each with its own installation method
+
+## `sessionInfo()` {#sec-session-info}
+
+```{r}
+#| label: session-info
+#| eval: false
+
+sessionInfo()      # output is long: run it in the Console to see yours
+```
+
+- Your R version, operating system, and loaded packages with versions
+- **Include it whenever you ask for help**
+
+# Working Directories and File Paths {#sec-paths}
+
+## Folders Form a Tree
+
+```
+C:/                              <- the root: top of the tree (Mac: /)
+`-- Users/
+    `-- tek/                     <- your home folder (~)
+        `-- Documents/
+            `-- dba/             <- suppose this is the working directory
+                |-- analysis.qmd
+                `-- data/
+                    `-- survey.csv
+```
+
+- **Absolute** path, from the root: `C:/Users/tek/Documents/dba/data/survey.csv`
+- **Relative** path, from `dba/`: `data/survey.csv`
+- Going **up** with `..`, from `data/`: `../analysis.qmd`
+- Mac: same tree, but the root is `/` with no drive letter: `/Users/tek/Documents/dba/...`
+
+## Folders and Paths
+
+| Kind of path | Example |
+|--------------|---------|
+| Absolute (Windows) | `C:/Users/tek/Documents/dba/data/survey.csv` |
+| Absolute (Mac) | `/Users/tek/Documents/dba/data/survey.csv` |
+| Relative | `data/survey.csv` (from the **current folder**) |
+
+| Symbol | Meaning |
+|--------|---------|
+| `/` | Separates folders; the root folder on a Mac |
+| `~` | Your home folder |
+| `.` / `..` | The current folder / one level up |
+
+### Windows users {.alert}
+Use forward slashes (`C:/Users/tek`) or double backslashes (`C:\\Users\\tek`). A single `\` is a special character in R.
+
+## The Working Directory
+
+The folder R treats as "here." Every relative path starts from it.
+
+```{r}
+#| label: getwd
+
+getwd()
+```
+
+```{r}
+#| label: setwd
+#| eval: false
+
+setwd("C:/Users/tek/Documents/dba")   # Windows
+setwd("/Users/tek/Documents/dba")     # Mac
+setwd("..")                           # up one folder
+```
+
+Or: **Session $\rightarrow$ Set Working Directory $\rightarrow$ Choose Directory**
+
+## Why `setwd()` Causes Problems
+
+A script starting with `setwd("C:/Users/tek/...")` only works on **Tek's computer**.
+
+It breaks when you:
+
+- Share it with a coauthor
+- Move to a new laptop or rename a folder
+- Switch between Windows and Mac
+
+### The solution {.example}
+Never type your computer's address into a script. Use **RStudio Projects**.
+
+## RStudio Projects {#sec-projects}
+
+- A folder with a small `.Rproj` file inside
+- Opening the project sets the working directory to that folder **automatically**
+- All paths can be relative, so the folder can be moved, shared, or zipped
+
+**Create one:** File $\rightarrow$ New Project $\rightarrow$ New Directory $\rightarrow$ New Project $\rightarrow$ name it `dba-r-workshop` $\rightarrow$ Create Project
+
+**Reopen it:** double-click the `.Rproj` file, or File $\rightarrow$ Recent Projects
+
+## A Folder Layout That Works
+
+The same kind of tree, with the project folder at the top. Paths inside it stay the same wherever the folder sits.
+
+```
+dba-r-workshop/
+|-- dba-r-workshop.Rproj
+|-- data/          # raw data: never edit by hand
+|-- output/        # tables, figures, cleaned data your code creates
+|-- session1.qmd
+`-- session2.qmd
+```
+
+### Avoid OneDrive, iCloud, and Dropbox {.alert}
+Synced folders can lock files and cause confusing errors. On Windows, **Documents** is often synced to OneDrive. Use `C:/R-projects` (Windows) or `~/R-projects` (Mac).
+
+## The `here` Package {#sec-here}
+
+- A Quarto document uses **its own folder** as the working directory
+- `here()` always builds paths from the **project root**, wherever your file is
+
+```{r}
+#| label: here-example
+
+library(here)
+
+here()                          # the project root
+here("data", "survey.csv")      # correct separators on any computer
+```
+
+### The habit to build {.example}
+One Project per research project · raw data in `data/` · paths with `here()` · no `setwd()` in scripts you keep
+
+# Accessing Files from R {#sec-files}
+
+## Listing and Creating Files
+
+```{r}
+#| label: list-files
+
+list.files()                         # files in the working directory
+list.files(pattern = "\\.qmd$")      # only files ending in .qmd
+```
+
+```{r}
+#| label: create-files
+
+dir.create(here("data"), showWarnings = FALSE)   # no warning if it exists
+dir.exists(here("data"))
+```
+
+## Writing a CSV File
+
+```{r}
+#| label: write-csv
+
+sales <- data.frame(
+  region  = c("East", "South", "West", "North"),
+  revenue = c(125000, 98000, 143500, 87250),
+  stores  = c(12, 9, 15, 8)
+)
+
+write.csv(sales, here("data", "sales.csv"), row.names = FALSE)
+
+file.exists(here("data", "sales.csv"))
+```
+
+- Open the `data` folder in the **Files** pane: `sales.csv` is there
+
+## Reading a CSV File
+
+```{r}
+#| label: read-csv
+
+sales_in <- read.csv(here("data", "sales.csv"))
+str(sales_in)        # structure: column names and types
+dim(sales_in)        # rows and columns
+```
+
+- Also: `head()` for the first rows, `View()` for a spreadsheet viewer
+- Session 4 covers Excel, SPSS, Stata, and messier CSV files
+
+### Deleting files {.alert}
+`file.remove()` and `unlink()` delete **permanently**, without the Recycle Bin or Trash.
+
+# Scripts and Quarto Documents {#sec-quarto}
+
+## Two Kinds of Files
+
+| | R script (`.R`) | Quarto document (`.qmd`) |
+|---|---|---|
+| Contains | Code and `#` comments | Text, code, and output together |
+| Best for | Analysis pipelines, data cleaning | Reports, notes, papers, homework |
+| Output | Results in the Console | HTML, Word, or PDF |
+
+- Quarto is the successor to R Markdown: same ideas
+
+**Your first document:** File $\rightarrow$ New File $\rightarrow$ Quarto Document $\rightarrow$ title $\rightarrow$ **Create** $\rightarrow$ save in your project $\rightarrow$ **Render** (`Ctrl`/`Cmd` + `Shift` + `K`)
+
+## Anatomy of a Quarto Document
+
+````markdown
+---
+title: "My First Quarto Document"
+author: "Your Name"
+format: html
+---
+
+## Introduction
+
+This is **plain text** written in Markdown.
+
+```{{r}}
+#| label: first-chunk
+
+x <- c(3, 7, 12)
+mean(x)
+```
+````
+
+1. **Header** between `---` lines: title and output format
+2. **Text** in Markdown: `**bold**`, `*italic*`, `## Heading`, `- bullet`
+3. **Code chunks**; lines starting with `#|` are chunk options
+
+## Chunk Options
+
+| Option | Effect |
+|--------|--------|
+| `#| eval: false` | Show the code but do not run it |
+| `#| echo: false` | Run the code, show only the output |
+| `#| include: false` | Run the code, show nothing |
+| `#| warning: false` | Hide warnings |
+| `#| label: name` | Name the chunk |
+
+Insert a chunk: `Ctrl` + `Alt` + `I` (Windows), `Cmd` + `Option` + `I` (Mac)
+
+### Rendering starts from a clean slate {.alert}
+Render runs your document top to bottom in a **fresh R session**. Objects created in the Console do not exist there. "Object not found" means the code that creates it is missing from the document.
+
+# Getting Help {#sec-help}
+
+## Help Inside R
+
+```{r}
+#| label: help
+#| eval: false
+
+?mean                         # help page for a function
+help(package = "here")        # everything in a package
+??"regression"                # search all installed help pages
+vignette(package = "dplyr")   # list a package's tutorials
+vignette("dplyr")             # open one
+example(mean)                 # run the examples from a help page
+```
+
+**Reading a help page:** Description $\rightarrow$ Usage $\rightarrow$ Arguments $\rightarrow$ **Examples** (copy and run them)
+
+## Reading Error Messages
+
+| Message | Usual cause |
+|---------|-------------|
+| `could not find function "ggplot"` | Package not loaded: `library(ggplot2)` |
+| `there is no package called 'here'` | Not installed: `install.packages("here")` |
+| `object 'sales' not found` | Typo, or the code that creates it was not run |
+| `cannot open file ... No such file or directory` | Wrong path: check `getwd()`, use `here()` |
+| `unexpected symbol` / `unexpected ')'` | Missing comma, quote, or bracket |
+
+### Warnings are not errors {.example}
+A **warning** means R did something but wants you to check it. An **error** means R stopped.
+
+## Asking for Help Well
+
+Include:
+
+1. **What you were trying to do**
+2. **The code**, as text rather than a screenshot
+3. **The exact error message**, copied in full
+4. **`sessionInfo()`** output
+
+Writing the question carefully often helps you find the answer yourself.
+
+## Using AI Assistants
+
+- Very good at explaining error messages and suggesting code
+- Treat answers like advice from a helpful classmate:
+  - Run the code and check the results make sense
+  - Understand each line before it goes into your research
+  - They can invent functions or arguments that do not exist
+
+### Research data {.alert}
+Never paste confidential or identifiable research data into an AI tool without checking your IRB protocol and your institution's policy.
+
+## Good Places to Learn More
+
+- [R for Data Science (2e)](https://r4ds.hadley.nz/): free online book, the best next step
+- [Posit Cheatsheets](https://posit.co/resources/cheatsheets/): one-page summaries
+- [Quarto Guide](https://quarto.org/docs/guide/)
+- [Posit Community](https://forum.posit.co/) and [Stack Overflow](https://stackoverflow.com/questions/tagged/r): search before posting
+
+# Troubleshooting Installation {#sec-troubleshoot}
+
+## Common Problems
+
+| Problem | What to try |
+|---------|-------------|
+| Installer asks for an administrator password | Ask IT, or use Posit Cloud |
+| "Use a personal library instead?" | Answer **yes** |
+| Package errors mentioning OneDrive | Keep projects outside OneDrive |
+| Errors with strange characters in paths | Use a simple folder such as `C:/R-projects` |
+| Mac: "incompatible architecture" | Check `R.version$arch`; reinstall `arm64` |
+| Mac: arm64 installer refuses | Update to macOS 14+, or Posit Cloud |
+| RStudio cannot find R | Install R, then restart the computer |
+| A package needs "compilation" and fails | Answer **no**, or install Rtools / Command Line Tools |
+
+Where your packages are stored: `.libPaths()`
+
+# Your Turn {#sec-your-turn}
+
+## Exercise
+
+### Tasks {.alert}
+1. Install R and RStudio. Confirm `R.version$arch` matches your computer
+2. Change the RStudio day-one settings
+3. Create an RStudio Project `dba-r-workshop`, **not** in OneDrive or iCloud
+4. Install the course packages; confirm every package returns `TRUE`
+5. Create a `data` folder; save the data frame below as `data/employees.csv`; read it back and check it with `str()`
+6. Create a Quarto document that reads the file and computes the average salary; render it
+7. **Bonus:** run `library(heer)` and read the error. Use `?read.csv` to find what `na.strings` does
+
+## Exercise Data
+
+```{r}
+#| label: exercise-data
+
+employees <- data.frame(
+  name       = c("Ana", "Ben", "Chloe", "Dev", "Eun-ji"),
+  department = c("Sales", "HR", "IT", "Sales", "IT"),
+  salary     = c(68000, 72000, 95000, 61000, 102000)
+)
+```
+
+## Exercise: Solution (Steps 5 and 6)
+
+```{r}
+#| label: exercise-solution
+
+library(here)
+
+dir.create(here("data"), showWarnings = FALSE)
+write.csv(employees, here("data", "employees.csv"), row.names = FALSE)
+
+employees_in <- read.csv(here("data", "employees.csv"))
+str(employees_in)
+mean(employees_in$salary)
+```
+
+- The Quarto document needs **all** of this code, including `library(here)`, because rendering starts from a fresh R session
+
+# Summary {#sec-summary}
+
+## Key Takeaways
+
+- **R is the engine, RStudio is the dashboard.** Install R for your processor; on Apple silicon, `R.version$arch` must say `"aarch64"`
+- **Turn off saving and restoring `.RData`**: scripts are the complete record of your work
+- **Install** once with `install.packages()`; **load** every session with `library()`
+- **One RStudio Project per research project**, paths with `here()`, no `setwd()` in scripts you keep
+- **Quarto renders in a fresh R session**: documents must contain all the code they need
+- **Read error messages**, use `?function`, and include code, error, and `sessionInfo()` when asking for help
+
+**Next session:** data types and structures
