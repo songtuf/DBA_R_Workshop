@@ -1,0 +1,634 @@
+---
+title: "Session 5: Data Wrangling with dplyr"
+subtitle: "R Workshop for DBA Students"
+author: "Taikgun Song"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    number-sections: true
+    code-copy: true
+    code-tools: true
+    embed-resources: true
+    grid:
+      body-width: 1100px   # main text column (Quarto default: 800px)
+      margin-width: 150px  # right margin, unused here (default: 250px)
+    tbl-colwidths: false   # let the browser size table columns to their contents
+execute:
+  echo: true
+  warning: true
+---
+
+<!--
+HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
+- Companion slides: session5-slides.qmd
+- BEFORE RENDERING: put finance_example.csv in data/ (as in Session 4).
+  While testing, you can read it from the web instead (see the `read-data` chunk).
+- Data facts mentioned in the text (checked 2026-11-13 against the GitHub copy):
+  3,808 companies x 224 columns; 11 sectors; first column (ticker) has an empty header;
+  GNL has a 2015 price change of about +2,418,600%; IGLD has a market cap of about
+  $96 trillion; 5 firms have negative revenue and 166 have zero revenue;
+  ROE and returnOnEquity are (nearly) identical columns.
+- Requires: tidyverse.
+-->
+
+::: {.callout-note}
+## Session Objectives
+
+By the end of this session, you will be able to:
+
+1. Look at a large dataset with `glimpse()` and `View()`
+2. Choose and rename columns with `select()`
+3. Choose rows with `filter()`, and use it to find data problems
+4. Sort with `arrange()` and pick top-N lists with `slice_max()`
+5. Create new columns with `mutate()`
+6. Summarise data by group with `group_by()` and `summarise()`
+7. Apply the same function to several columns with `across()`
+8. Chain all of these into one readable pipeline
+:::
+
+```{r}
+#| label: setup
+#| warning: false   # hide 'package built under R version x.y.z' warnings
+#| message: false
+
+library(tidyverse)
+```
+
+# Why `dplyr`? {#sec-why}
+
+`dplyr` (part of the tidyverse) is a small set of functions, called **verbs**, each doing one job on a data frame. You chain them with the pipe `|>` from Session 3, so the code reads like a description of what you are doing: *take the finance data, then keep the technology firms, then sort them by revenue*.
+
+You already know how to do each of these jobs another way:
+
+| Task | `dplyr` | Base R (Session 2) | Excel | SQL |
+|------|---------|--------------------|-------|-----|
+| Choose columns | `select()` | `df[, c("a", "b")]` | Hide columns | `SELECT a, b` |
+| Choose rows | `filter()` | `df[df$x > 5, ]` | AutoFilter | `WHERE x > 5` |
+| Sort | `arrange()` | `df[order(df$x), ]` | Sort | `ORDER BY x` |
+| New column | `mutate()` | `df$y <- df$x * 2` | Formula column | `SELECT x * 2 AS y` |
+| Summarise by group | `group_by()` + `summarise()` | `tapply()`, `aggregate()` | Pivot table | `GROUP BY` |
+
+Every verb works the same way:
+
+- The **first argument** is a data frame, so verbs chain naturally with `|>`
+- Columns are referred to **by name**, without quotes or `df$`
+- The result is a **new** data frame; the original is unchanged unless you assign the result with `<-`
+
+# The Data {#sec-data}
+
+We use the financial statement data from Session 4: one row per US-listed company, with 2014 financial statements and each stock's price change during 2015.
+
+```{r}
+#| label: read-data
+
+finance_raw <- read.csv("data/finance_example.csv", check.names = FALSE)
+# While testing, you can read it from the web instead:
+# finance_raw <- read.csv("https://raw.githubusercontent.com/RWorkshop-at-UF/rworkshop-at-uf.github.io/refs/heads/main/session5/data/finance_example.csv", check.names = FALSE)
+
+names(finance_raw)[1] <- "ticker"            # the first column has no name
+finance_raw <- as_tibble(finance_raw)
+```
+
+`as_tibble()` turns the data frame into a **tibble** (Session 2), which prints only the rows and columns that fit on screen instead of flooding the Console:
+
+```{r}
+#| label: print-tibble
+
+finance_raw
+```
+
+## Looking at Data: `glimpse()` and `View()` {#sec-look}
+
+`glimpse()` is the tidyverse version of `str()`: every column's name, type, and first few values, one column per line. For a dataset with 224 columns, we look at the first 15:
+
+```{r}
+#| label: glimpse
+
+finance_raw |>
+  select(1:15) |>
+  glimpse()
+```
+
+`View()` opens the data in a spreadsheet-style tab. Clicking a data frame's name in the **Environment** pane does the same thing.
+
+```{r}
+#| label: view
+#| eval: false
+
+View(finance_raw)
+```
+
+In the viewer you can scroll, **sort** by clicking a column header, **filter** with the Filter button, and **search** with the search box. These are for looking only: they never change the data. To keep a sorted or filtered version, you need `arrange()` or `filter()`, which is what this session is about.
+
+::: {.callout-tip}
+## `View()` at the end of a pipeline
+`View()` works on the result of any pipeline, which makes it an easy way to check each step of your wrangling: `finance_raw |> filter(Sector == "Energy") |> View()`.
+:::
+
+# `select()`: Choose Columns {#sec-select}
+
+## By Name and Position {#sec-select-name}
+
+List the columns you want. Names with spaces or symbols need backticks:
+
+```{r}
+#| label: select-name
+
+finance_raw |>
+  select(ticker, Sector, Revenue, `Net Income`)
+```
+
+A colon selects a range of adjacent columns, and a minus sign drops columns:
+
+```{r}
+#| label: select-range
+
+finance_raw |> select(ticker, Revenue:`Gross Profit`)   # ticker, then Revenue through Gross Profit
+finance_raw |> select(-ticker) |> ncol()                # everything except ticker
+```
+
+## Selection Helpers {#sec-select-helpers}
+
+With 224 columns, typing names is slow. **Helpers** select columns by a pattern in their names or by their type:
+
+| Helper | Selects columns whose name... |
+|--------|-------------------------------|
+| `starts_with("Net")` | starts with "Net" |
+| `ends_with("Growth")` | ends with "Growth" |
+| `contains("margin")` | contains "margin" (upper or lower case) |
+| `where(is.numeric)` | (by type) are numeric |
+
+```{r}
+#| label: select-helpers
+
+finance_raw |> select(contains("margin")) |> names()
+finance_raw |> select(ends_with("Growth")) |> ncol()
+finance_raw |> select(where(is.character)) |> names()
+```
+
+Look at the margin columns: `Net Profit Margin` and `netProfitMargin`, `Gross Margin` and `grossProfitMargin`. Wide datasets assembled from several sources often contain the **same measure twice** under different names. A quick check:
+
+```{r}
+#| label: duplicate-measures
+
+finance_raw |>
+  select(ticker, ROE, returnOnEquity) |>
+  head()
+```
+
+They are the same. Pick one and document your choice, so that you and your coauthors always use the same column.
+
+## Rename While Selecting {#sec-select-rename}
+
+`select()` can rename as it selects, using `new_name = old_name`. This is the quickest way to build a **working dataset**: only the columns you need, with short `snake_case` names.
+
+```{r}
+#| label: working-data
+
+fin <- finance_raw |>
+  select(ticker,
+         sector            = Sector,
+         revenue           = Revenue,
+         revenue_growth    = `Revenue Growth`,
+         gross_profit      = `Gross Profit`,
+         gross_margin      = `Gross Margin`,
+         net_income        = `Net Income`,
+         net_margin        = `Net Profit Margin`,
+         rd_expenses       = `R&D Expenses`,
+         dividend_ps       = `Dividend per Share`,
+         market_cap        = `Market Cap`,
+         debt_to_equity    = `Debt to Equity`,
+         price_change_2015 = `2015 PRICE VAR [%]`)
+
+glimpse(fin)
+```
+
+From now on we work with `fin`. Two related verbs:
+
+```{r}
+#| label: rename-relocate
+
+fin |> rename(company = ticker) |> names()            # rename, keep all columns
+fin |> relocate(price_change_2015, .after = sector)   # move a column
+```
+
+# `filter()`: Choose Rows {#sec-filter}
+
+## Conditions {#sec-filter-conditions}
+
+`filter()` keeps the rows where a condition is `TRUE`, using the comparison and logical operators from Session 3:
+
+```{r}
+#| label: filter-basic
+
+fin |> filter(sector == "Technology")
+```
+
+Several conditions separated by commas must **all** be true (the same as `&`):
+
+```{r}
+#| label: filter-and
+
+fin |> filter(sector == "Technology", revenue > 10e9)   # 10e9 = 10 billion
+```
+
+Use `|` for "or", and `%in%` for "any of these values":
+
+```{r}
+#| label: filter-or
+
+fin |> filter(sector == "Energy" | sector == "Utilities") |> nrow()
+fin |> filter(sector %in% c("Energy", "Utilities")) |> nrow()          # same, easier to read
+```
+
+## Missing Values {#sec-filter-na}
+
+`filter()` keeps only rows where the condition is `TRUE`. A comparison with a missing value gives `NA`, not `TRUE`, so **rows with missing values are silently dropped**:
+
+```{r}
+#| label: filter-na
+
+nrow(fin)
+sum(is.na(fin$market_cap))
+fin |> filter(market_cap > 0) |> nrow()     # the missing values are gone
+```
+
+Usually that is what you want, but be aware of it. To find or keep missing values on purpose, use `is.na()`:
+
+```{r}
+#| label: filter-isna
+
+fin |> filter(is.na(revenue)) |> select(ticker, sector, revenue)
+fin |> filter(!is.na(market_cap)) |> nrow()
+```
+
+## Using `filter()` to Find Data Problems {#sec-sanity}
+
+Before summarising anything, look for values that cannot be right. `filter()` is the tool for this:
+
+```{r}
+#| label: sanity-revenue
+
+fin |> filter(revenue < 0) |> select(ticker, sector, revenue)   # negative revenue?
+fin |> filter(revenue == 0) |> nrow()                            # zero revenue
+```
+
+```{r}
+#| label: sanity-price
+
+fin |>
+  filter(price_change_2015 > 1000) |>         # a stock price that rose more than 1000%?
+  select(ticker, sector, price_change_2015)
+```
+
+A 2015 price change of more than two million percent is almost certainly a data error (for example, a stock split or a ticker change), not a real return. What to do about values like these is a **research decision**: exclude them, correct them from another source, or keep them and use methods that are robust to them. Whatever you decide, do it in code and write down why.
+
+For this session, we keep firms with positive revenue:
+
+```{r}
+#| label: fin-clean
+
+fin_clean <- fin |> filter(revenue > 0)     # also drops the missing revenues
+nrow(fin_clean)
+```
+
+# `arrange()`: Sort Rows {#sec-arrange}
+
+`arrange()` sorts from smallest to largest; wrap a column in `desc()` for largest first:
+
+```{r}
+#| label: arrange
+
+fin_clean |> arrange(revenue) |> select(ticker, sector, revenue) |> head(3)
+fin_clean |> arrange(desc(revenue)) |> select(ticker, sector, revenue) |> head(5)
+```
+
+Sort by several columns: the second breaks ties in the first.
+
+```{r}
+#| label: arrange-two
+
+fin_clean |>
+  arrange(sector, desc(market_cap)) |>
+  select(ticker, sector, market_cap)
+```
+
+## Top-N Lists with `slice_max()` {#sec-slice}
+
+`slice_max()` keeps the rows with the largest values; `slice_min()` the smallest:
+
+```{r}
+#| label: slice-max
+
+fin_clean |>
+  slice_max(market_cap, n = 5) |>
+  select(ticker, sector, market_cap)
+```
+
+Look at the first row. Is a market cap of about $96 trillion plausible? Sorting and top-N lists are another quick way to catch data problems: errors tend to sit at the extremes.
+
+# `mutate()`: Create Columns {#sec-mutate}
+
+`mutate()` adds new columns (or changes existing ones), calculated from other columns. `.after` places the new column next to related ones:
+
+```{r}
+#| label: mutate-basic
+
+fin_clean |>
+  mutate(gross_margin_calc = gross_profit / revenue, .after = gross_margin) |>
+  select(ticker, gross_profit, revenue, gross_margin, gross_margin_calc)
+```
+
+Recalculating a ratio from its parts is a good way to check that you understand what a column means. Here the calculated margin matches the one in the data for most firms; exercise 4 (@sec-your-turn) looks at some that do not.
+
+Several new columns can be created at once, and a new column can be used right away in the same `mutate()`. The functions from Session 3 work inside it:
+
+```{r}
+#| label: mutate-many
+
+fin_clean <- fin_clean |>
+  mutate(
+    revenue_bn = revenue / 1e9,                                      # revenue in billions
+    price_up   = if_else(price_change_2015 > 0, "Up", "Down"),
+    size       = case_when(
+      is.na(market_cap)   ~ NA,
+      market_cap >= 10e9  ~ "Large cap",
+      market_cap >= 2e9   ~ "Mid cap",
+      .default            = "Small cap"
+    ),
+    size = factor(size, levels = c("Small cap", "Mid cap", "Large cap"))
+  )
+
+fin_clean |> select(ticker, revenue_bn, price_up, market_cap, size)
+```
+
+The last line turns `size` into a factor with a meaningful order (Session 2), so tables and plots list the categories from small to large rather than alphabetically.
+
+# `group_by()` and `summarise()`: Summarise by Group {#sec-summarise}
+
+## `summarise()` {#sec-summarise-basic}
+
+`summarise()` collapses a data frame into one row of summary statistics:
+
+```{r}
+#| label: summarise
+
+fin_clean |>
+  summarise(n_firms        = n(),                                 # number of rows
+            median_revenue = median(revenue_bn),
+            median_margin  = median(net_margin, na.rm = TRUE))
+```
+
+`n()` counts rows. As in Session 2, any column with missing values needs `na.rm = TRUE`.
+
+## `group_by()` + `summarise()` {#sec-group-by}
+
+The real power comes from combining `summarise()` with `group_by()`: one row of summaries **per group**, like a pivot table.
+
+```{r}
+#| label: group-summarise
+
+fin_clean |>
+  group_by(sector) |>
+  summarise(n_firms       = n(),
+            mean_margin   = mean(net_margin, na.rm = TRUE),
+            median_margin = median(net_margin, na.rm = TRUE)) |>
+  arrange(desc(median_margin))
+```
+
+::: {.callout-important}
+## Mean or median?
+Compare the mean and median net margin for Healthcare and Industrials. A handful of firms with tiny revenues and large losses have net margins of thousands of percent negative, and they drag the **mean** to a loss many times larger than revenue. The **median** is hardly affected by them: the typical Healthcare firm in this data (many are early-stage biotech companies) loses a modest share of its revenue. With skewed financial data like this, the median usually describes a typical firm better. Always look at both, and look at the extreme values (@sec-sanity) before deciding.
+:::
+
+Group by several columns to get one row per combination:
+
+```{r}
+#| label: group-two
+
+fin_clean |>
+  group_by(sector, size) |>
+  summarise(n_firms = n(), .groups = "drop")
+```
+
+`.groups = "drop"` removes the grouping from the result; without it, `dplyr` prints a message about the grouping it kept.
+
+## Counting with `count()` {#sec-count}
+
+Counting rows per group is so common that it has a shortcut:
+
+```{r}
+#| label: count
+
+fin_clean |> count(sector, sort = TRUE)
+fin_clean |> count(sector, price_up)        # one row per combination
+```
+
+The second table would be easier to read with "Up" and "Down" as separate columns. Reshaping tables like that is a Session 6 topic.
+
+## Proportions: the Mean of a Logical {#sec-proportions}
+
+Recall from Session 3 that the mean of `TRUE`/`FALSE` values is a proportion. Combined with `group_by()`, this answers questions like "what share of each sector's stocks went up in 2015?":
+
+```{r}
+#| label: share-up
+
+fin_clean |>
+  group_by(sector) |>
+  summarise(share_up = mean(price_change_2015 > 0)) |>
+  arrange(share_up)
+```
+
+Energy is at the bottom by a wide margin: oil prices collapsed in 2014–2015, and most energy stocks fell with them. Summaries like this are where data starts to tell a story.
+
+## `group_by()` with `mutate()`, and `ungroup()` {#sec-grouped-mutate}
+
+`group_by()` also works with `mutate()`. Then calculations like `sum()` or `mean()` are done **within each group**, but every row is kept. For example, each firm's share of its sector's total revenue:
+
+```{r}
+#| label: grouped-mutate
+
+fin_clean |>
+  group_by(sector) |>
+  mutate(sector_share = revenue / sum(revenue)) |>
+  ungroup() |>
+  slice_max(sector_share, n = 5) |>
+  select(ticker, sector, revenue_bn, sector_share)
+```
+
+::: {.callout-warning}
+## Always `ungroup()` after a grouped `mutate()`
+A grouped data frame stays grouped. Without `ungroup()`, the `slice_max()` above would return the top 5 firms **in each sector** rather than overall, and later steps can behave in surprising ways. When you no longer need the groups, `ungroup()`.
+:::
+
+::: {.callout-note}
+## The `.by` shortcut
+Newer versions of `dplyr` also accept the grouping inside the verb, for that one step only, so there is nothing to ungroup:
+`fin_clean |> summarise(median_margin = median(net_margin, na.rm = TRUE), .by = sector)`.
+You will see both styles; this course uses `group_by()`, which is still the most common.
+:::
+
+# `across()`: One Function, Many Columns {#sec-across}
+
+To compute the same summary for several columns, `across()` saves you from writing it out each time. Give it the columns and a function, using the `\(x)` shorthand from Session 3:
+
+```{r}
+#| label: across-summarise
+
+fin_clean |>
+  group_by(sector) |>
+  summarise(across(c(gross_margin, net_margin, debt_to_equity),
+                   \(x) median(x, na.rm = TRUE)))
+```
+
+`.names` controls the names of the new columns; `{.col}` stands for the original name:
+
+```{r}
+#| label: across-names
+
+fin_clean |>
+  group_by(sector) |>
+  summarise(across(c(gross_margin, net_margin),
+                   \(x) median(x, na.rm = TRUE),
+                   .names = "median_{.col}"))
+```
+
+`across()` also works inside `mutate()`, and accepts the selection helpers from @sec-select-helpers:
+
+```{r}
+#| label: across-mutate
+
+fin_clean |>
+  mutate(across(c(net_income, market_cap), \(x) x / 1e9)) |>     # convert to billions
+  select(ticker, net_income, market_cap)
+```
+
+# Putting It Together {#sec-pipeline}
+
+Here is everything in one pipeline, from the raw file to a summary table. Read it aloud with "and then" for each `|>`:
+
+```{r}
+#| label: full-pipeline
+
+sector_summary <- finance_raw |>
+  select(ticker,
+         sector     = Sector,
+         revenue    = Revenue,
+         net_margin = `Net Profit Margin`,
+         market_cap = `Market Cap`,
+         price_change_2015 = `2015 PRICE VAR [%]`) |>
+  filter(revenue > 0) |>
+  mutate(large_cap = market_cap >= 10e9) |>
+  group_by(sector) |>
+  summarise(n_firms          = n(),
+            share_large_cap  = mean(large_cap, na.rm = TRUE),
+            median_margin    = median(net_margin, na.rm = TRUE),
+            share_price_up   = mean(price_change_2015 > 0)) |>
+  arrange(desc(median_margin))
+
+sector_summary
+```
+
+*Take the raw data, **and then** keep and rename six columns, **and then** keep firms with positive revenue, **and then** flag large-cap firms, **and then** group by sector, **and then** summarise each sector, **and then** sort by median margin.*
+
+::: {.callout-tip}
+## Build pipelines one step at a time
+Write the first line, run it, look at the result (`View()` helps), then add the next step. When a long pipeline gives a surprising result, run it again one line at a time to find where it goes wrong. Highlight the lines you want and press `Ctrl` + `Enter` (`Cmd` + `Return` on a Mac), stopping just before a `|>`.
+:::
+
+# Your Turn {#sec-your-turn}
+
+::: {.callout-important}
+## Exercise
+Use `fin_clean` from this session.
+
+1. **R&D intensity.** Create `rd_intensity = rd_expenses / revenue`. For the Technology and Healthcare sectors only, find the median R&D intensity in each. Which sector spends more of its revenue on R&D?
+2. **Dividend payers.** For each sector, find the share of firms that pay a dividend (`dividend_ps > 0`), ignoring missing values. Sort from highest to lowest. Which sectors are most and least likely to pay dividends?
+3. **Largest energy firms.** List the 5 Energy firms with the largest market cap, showing `ticker`, `market_cap` in billions, and `revenue_bn`.
+4. **Data check.** How many firms in `fin_clean` have a `gross_margin` below 0 or above 1? Show them with their `ticker`, `sector`, `gross_profit`, and `revenue`. Do these values look like errors?
+5. **Bonus pipeline.** For each `size` category (dropping firms with a missing size), compute the number of firms, the median 2015 price change, and the share of firms whose price went up. Do larger firms seem to have done better in 2015?
+:::
+
+```{r}
+#| label: exercise-starter
+#| eval: false
+
+# 1. R&D intensity
+
+
+# 2. Dividend payers
+
+
+# 3. Largest energy firms
+
+
+# 4. Data check
+
+
+# 5. Bonus pipeline
+```
+
+::: {.callout-tip collapse="true"}
+## Solution (click to expand)
+```{r}
+#| label: exercise-solution
+
+# 1. Healthcare: many drug and biotech firms spend heavily on research
+fin_clean |>
+  mutate(rd_intensity = rd_expenses / revenue) |>
+  filter(sector %in% c("Technology", "Healthcare")) |>
+  group_by(sector) |>
+  summarise(median_rd_intensity = median(rd_intensity, na.rm = TRUE))
+
+# 2. Utilities, Real Estate, and Financial Services pay most often;
+#    Healthcare and Technology least
+fin_clean |>
+  group_by(sector) |>
+  summarise(share_dividend = mean(dividend_ps > 0, na.rm = TRUE)) |>
+  arrange(desc(share_dividend))
+
+# 3.
+fin_clean |>
+  filter(sector == "Energy") |>
+  slice_max(market_cap, n = 5) |>
+  mutate(market_cap_bn = market_cap / 1e9) |>
+  select(ticker, market_cap_bn, revenue_bn)
+
+# 4. Negative gross margins are possible (costs above revenue), but values above 1
+#    mean gross profit exceeds revenue, which should not happen
+fin_clean |>
+  filter(gross_margin < 0 | gross_margin > 1) |>
+  select(ticker, sector, gross_profit, revenue, gross_margin) |>
+  arrange(gross_margin)
+
+# 5. Slightly: most stocks fell in 2015, but large caps fell less
+fin_clean |>
+  filter(!is.na(size)) |>
+  group_by(size) |>
+  summarise(n_firms             = n(),
+            median_price_change = median(price_change_2015),
+            share_up            = mean(price_change_2015 > 0))
+```
+:::
+
+# Summary {#sec-summary}
+
+- **`dplyr` verbs** take a data frame first, refer to columns by name, and return a new data frame, so they chain with `|>` (@sec-why).
+- **`glimpse()`** shows every column's type; **`View()`** lets you look, sort, and filter without changing the data (@sec-look).
+- **`select()`** chooses and renames columns; helpers like `contains()` and `where()` select by pattern or type (@sec-select).
+- **`filter()`** keeps rows where a condition is `TRUE`, which silently drops missing values. Use it to look for data problems before summarising (@sec-filter).
+- **`arrange()`** and **`slice_max()`** sort and pick top-N lists; extremes are where errors hide (@sec-arrange).
+- **`mutate()`** creates columns, using `if_else()`, `case_when()`, and `factor()` (@sec-mutate).
+- **`group_by()` + `summarise()`** works like a pivot table. Look at medians as well as means, and `ungroup()` after a grouped `mutate()` (@sec-summarise).
+- **`across()`** applies one function to many columns (@sec-across).
+
+**Next session:** joining tables, reshaping between long and wide formats, and handling missing data.
+
+## Further Reading
+
+- [R for Data Science (2e): Data transformation](https://r4ds.hadley.nz/data-transform.html)
+- [dplyr documentation](https://dplyr.tidyverse.org/)
+- [Data transformation with dplyr cheatsheet](https://posit.co/resources/cheatsheets/)

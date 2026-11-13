@@ -1,0 +1,662 @@
+---
+title: "Session 4: Importing and Saving Data"
+subtitle: "R Workshop for DBA Students"
+author: "Taikgun Song"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    number-sections: true
+    code-copy: true
+    code-tools: true
+    embed-resources: true
+    grid:
+      body-width: 1100px   # main text column (Quarto default: 800px)
+      margin-width: 150px  # right margin, unused here (default: 250px)
+    tbl-colwidths: false   # let the browser size table columns to their contents
+execute:
+  echo: true
+  warning: true
+---
+
+<!--
+HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
+- Companion slides: session4-slides.qmd
+- BEFORE RENDERING: put finance_example.csv in data/ (the render reads it).
+- PLACEHOLDER: replace the URL in the `finance-url` chunk once the file has its new home.
+- PLACEHOLDER: the Excel section uses readxl's built-in example files for now.
+  Replace with the Qualtrics .xlsx export when it is ready.
+- The finance code assumes the first column (company ticker) has an empty header,
+  as in the original 2014-2018 financial indicators data. Check names(finance)[1]
+  after the first render and adjust the rename step if needed.
+- Rendering creates small example files in data/ (CSV, JSON, RDS, RData).
+- Requires: tidyverse, readxl, writexl, jsonlite, DBI, duckdb.
+- Paths are relative to this file's folder (e.g. "data/finance_example.csv").
+-->
+
+::: {.callout-note}
+## Session Objectives
+
+By the end of this session, you will be able to:
+
+1. Download a data file into your project and find it with relative paths
+2. Read CSV files, including messy ones with junk rows, odd column names, and missing-value codes
+3. Read Excel files, choosing sheets and cell ranges
+4. Read JSON files and recognize when the result is a list
+5. Save and load R's own formats, RDS and RData, and know when to use each
+6. Query a database with SQL from R, using DuckDB
+7. Check any newly imported dataset before analyzing it
+:::
+
+**Before you start:** open your workshop RStudio Project and run the setup chunk. If a package is missing, install it with `install.packages(c("readxl", "writexl", "jsonlite", "DBI", "duckdb"))`.
+
+```{r}
+#| label: setup
+#| warning: false   # hide 'package built under R version x.y.z' warnings
+#| message: false
+
+library(tidyverse)
+library(readxl)     # read Excel files
+library(jsonlite)   # read JSON files
+library(DBI)        # talk to databases
+```
+
+# File Formats at a Glance {#sec-formats}
+
+| Format | Extension | Typical source | Read with | Write with |
+|--------|-----------|----------------|-----------|------------|
+| CSV | `.csv` | Almost everything: databases, survey platforms, Excel | `read.csv()` | `write.csv()` |
+| Excel | `.xlsx`, `.xls` | Colleagues, finance and HR reports, Qualtrics | `readxl::read_excel()` | `writexl::write_xlsx()` |
+| JSON | `.json` | Web APIs, web apps, some data portals | `jsonlite::fromJSON()` | `jsonlite::write_json()` |
+| RDS | `.rds` | Your own R work: one object | `readRDS()` | `saveRDS()` |
+| RData | `.RData`, `.rda` | Your own R work: several objects | `load()` | `save()` |
+| Database | (server or file) | Company data warehouses | `DBI::dbGetQuery()` | `DBI::dbWriteTable()` |
+
+Every import follows the same three steps: **find** the file, **read** it, **check** it. This session spends as much time on finding and checking as on reading, because that is where most problems happen.
+
+# Getting a File into Your Project {#sec-download}
+
+Our first real dataset is `finance_example.csv`: financial statement data for US-listed companies, one row per company. It lives on the workshop website.
+
+```{r}
+#| label: finance-url
+
+# PLACEHOLDER: replace with the file's location on the workshop website
+finance_url <- "https://YOUR-WORKSHOP-SITE/data/finance_example.csv"
+```
+
+## Option 1: Download with Your Browser {#sec-browser}
+
+1. Open the link in your browser. Most browsers save the file to your **Downloads** folder.
+2. Move it into the `data/` folder of your workshop project. You can drag it in your computer's file manager, or copy it from R:
+
+```{r}
+#| label: copy-from-downloads
+#| eval: false
+
+file.copy(from = "~/Downloads/finance_example.csv",   # ~ is your home folder
+          to   = "data")
+```
+
+3. Check that R can see it:
+
+```{r}
+#| label: check-file
+
+list.files("data")
+file.exists("data/finance_example.csv")
+```
+
+::: {.callout-tip}
+## Where did my download go?
+If `file.copy()` returns `FALSE`, the file is not where you said it was. Look at the path in your browser's download list, or open the Downloads folder in RStudio's **Files** pane (click the `...` button at the top right of the pane to type a path). On Windows, `~` in R usually means your **Documents** folder, not your user folder, so the Downloads path is often `C:/Users/yourname/Downloads/finance_example.csv`.
+:::
+
+## Option 2: Download with Code {#sec-download-file}
+
+`download.file()` does the same thing in one line, which makes the step part of your reproducible record:
+
+```{r}
+#| label: download-file
+#| eval: false
+
+download.file(finance_url,
+              destfile = "data/finance_example.csv",
+              mode = "wb")        # "wb" (binary) avoids corrupted files on Windows
+```
+
+::: {.callout-note}
+## Reading directly from a URL
+`read.csv(finance_url)` also works, without saving the file. It is convenient, but if the website changes or goes offline, your analysis breaks. For research, keep a copy of the raw data in `data/`.
+:::
+
+# Reading CSV Files {#sec-csv}
+
+## A First Read {#sec-first-read}
+
+```{r}
+#| label: read-finance
+
+finance <- read.csv("data/finance_example.csv")
+
+dim(finance)              # rows and columns
+names(finance)[1:10]      # the first 10 column names
+```
+
+With hundreds of columns, `str(finance)` would fill the screen. `dim()` and a slice of `names()` are a better first look.
+
+## The Column-Name Problem {#sec-names}
+
+Look closely at the names. `read.csv()` changes any name that is not a valid R name: spaces and symbols become dots, a name starting with a number gets an `X` in front, and an empty header becomes `X`. Compare with the original names:
+
+```{r}
+#| label: check-names
+
+finance_raw <- read.csv("data/finance_example.csv", check.names = FALSE)
+
+names(finance_raw)[1:10]
+grep("PRICE VAR", names(finance_raw), value = TRUE)   # original name
+grep("PRICE.VAR", names(finance), value = TRUE)       # after read.csv() fixed it
+```
+
+`check.names = FALSE` keeps the original names, but then names with spaces need backticks: ``finance_raw$`Cost of Revenue` ``. Neither version is pleasant to type. The cleanest solution is to **rename** the columns you need to short, clear `snake_case` names.
+
+## Renaming Columns {#sec-rename}
+
+**Base R:** assign to `names()`, by position or by matching the old name.
+
+```{r}
+#| label: rename-base
+
+names(finance_raw)[1] <- "ticker"                         # the first column has no name
+names(finance_raw)[names(finance_raw) == "Cost of Revenue"] <- "cost_of_revenue"
+```
+
+**`dplyr::rename()`:** `new_name = old_name`, several at once. Old names with spaces or symbols go in backticks.
+
+```{r}
+#| label: rename-dplyr
+
+finance_raw <- rename(finance_raw,
+                      revenue         = Revenue,
+                      sector          = Sector,
+                      price_var_2015  = `2015 PRICE VAR [%]`)
+
+finance_raw[1:5, c("ticker", "sector", "revenue", "cost_of_revenue", "price_var_2015")]
+```
+
+Rename only the columns you will use. With hundreds of columns, renaming everything by hand is not worth it.
+
+::: {.callout-tip}
+## Many packages, one job
+Cleaning column names is so common that several packages automate it; for example, `janitor::clean_names()` turns every name into `snake_case` in one step. You will find alternatives like this for almost every task in this workshop. Explore them and adopt what works for you.
+:::
+
+## A Messy CSV {#sec-messy-csv}
+
+Real exports are rarely clean. The file below has two lines of notes above the header, dollar signs and commas in the numbers, `N/A` for missing spend, and `99` for "Prefer not to answer." (In a real project you would receive this file; here we create it so everyone has the same one.)
+
+```{r}
+#| label: make-messy-csv
+
+writeLines(c(
+  "Customer export - generated 2026-11-01",
+  "Confidential: internal use only",
+  "Customer ID,Region,Annual Spend ($),Satisfaction (1-5),Signup Date",
+  'C001,East,"$1,200",4,03/15/2022',
+  "C002,South,$850,99,11/02/2024",
+  "C003,West,N/A,3,07/30/2019",
+  'C004,East,"$2,300",5,01/09/2025',
+  "C005,West,$99,2,06/21/2021",
+  "C006,South,$640,99,09/14/2023"
+), "data/customers_export.csv")
+```
+
+Click the file in the **Files** pane and choose **View File** to see the raw text. A plain read fails:
+
+```{r}
+#| label: messy-plain
+#| error: true
+
+read.csv("data/customers_export.csv")
+```
+
+R treated the first note line as the header, found one column name but five columns of data, and stopped. Three arguments fix the read:
+
+```{r}
+#| label: messy-fixed
+
+customers <- read.csv("data/customers_export.csv",
+                      skip        = 2,          # skip the two note lines
+                      na.strings  = c("", "N/A"),
+                      check.names = FALSE)
+str(customers)
+```
+
+Now clean the columns one at a time:
+
+```{r}
+#| label: messy-clean
+
+customers <- rename(customers,
+                    customer_id  = `Customer ID`,
+                    region       = Region,
+                    spend        = `Annual Spend ($)`,
+                    satisfaction = `Satisfaction (1-5)`,
+                    signup_date  = `Signup Date`)
+
+# "$1,200" -> 1200: remove "$" and "," then convert to a number
+customers$spend <- as.numeric(gsub("[$,]", "", customers$spend))
+
+# 99 means "Prefer not to answer", but only in the satisfaction column
+customers$satisfaction[customers$satisfaction == 99] <- NA
+
+customers$signup_date <- mdy(customers$signup_date)
+
+str(customers)
+```
+
+::: {.callout-warning}
+## Why not `na.strings = "99"`?
+`na.strings` applies to **every** column. Customer C005 really did spend `$99`, and that value would have been turned into `NA` too. Recode missing-value codes column by column, as in Session 3's `clean_missing()`.
+:::
+
+`gsub("[$,]", "", x)` replaces every `$` and `,` with nothing. The pattern inside `[ ]` lists the characters to remove; patterns like this are called regular expressions.
+
+::: {.callout-note}
+## `readr::read_csv()`
+The `readr` package (part of the tidyverse) has a faster alternative, `read_csv()`. It keeps column names as they are, never turns text into factors, reports the type it chose for each column, and returns a tibble. Its `parse_number()` function turns `"$1,200"` into `1200` without a regular expression. Try it on the same file: `readr::read_csv("data/customers_export.csv", skip = 2)`.
+:::
+
+# Reading Excel Files {#sec-excel}
+
+<!-- PLACEHOLDER: replace the readxl example files with the Qualtrics .xlsx export -->
+
+The `readxl` package reads `.xlsx` and `.xls` files without needing Excel installed. It comes with example files, which we use here.
+
+## Sheets {#sec-sheets}
+
+An Excel file can contain several sheets. List them first, then choose one by name or position:
+
+```{r}
+#| label: excel-sheets
+
+datasets_path <- readxl_example("datasets.xlsx")   # path to an example file
+
+excel_sheets(datasets_path)
+
+mtcars_xl <- read_excel(datasets_path, sheet = "mtcars")
+head(mtcars_xl, 3)
+```
+
+To read **every** sheet, combine `excel_sheets()` with `map()` from Session 3:
+
+```{r}
+#| label: excel-all-sheets
+
+sheet_names <- excel_sheets(datasets_path)
+
+all_sheets <- map(sheet_names, \(s) read_excel(datasets_path, sheet = s))
+names(all_sheets) <- sheet_names
+
+map_int(all_sheets, nrow)          # rows in each sheet
+```
+
+## Notes Above and Below the Data {#sec-ranges}
+
+Spreadsheets made for people often have titles, notes, and totals around the data. `deaths.xlsx` has four lines of notes above the table and notes below it:
+
+```{r}
+#| label: excel-messy
+
+deaths_path <- readxl_example("deaths.xlsx")
+
+read_excel(deaths_path, sheet = "arts") |> head(6)     # notes become data
+```
+
+Either skip rows and limit how many are read, or give the exact cell range:
+
+```{r}
+#| label: excel-range
+
+read_excel(deaths_path, sheet = "arts", skip = 4, n_max = 10)
+read_excel(deaths_path, range = "arts!A5:F15")         # sheet!cells, as in Excel
+```
+
+| Argument | Use it to |
+|----------|-----------|
+| `sheet` | Choose a sheet by name or number |
+| `skip` | Skip rows at the top |
+| `n_max` | Read at most this many rows |
+| `range` | Read an exact block of cells, e.g. `"Sheet1!B3:H40"` |
+| `na` | Values to treat as missing, e.g. `c("", "N/A")` |
+| `col_types` | Set column types instead of letting `readxl` guess |
+
+::: {.callout-tip}
+## Excel dates and formatting
+`read_excel()` reads the **values** in cells, not their formatting. Colors, bold text, and merged cells are lost, and a column that mixes numbers and text is read as text. If something looks wrong, open the file in Excel and check what is actually in the cells.
+:::
+
+# Reading JSON Files {#sec-json}
+
+JSON ("JavaScript Object Notation") is the standard format for data from web APIs. It stores **records** as name-value pairs:
+
+```{r}
+#| label: make-json
+
+writeLines('[
+  {"store": "S01", "region": "East",  "sales": 125000, "open_weekends": true},
+  {"store": "S02", "region": "South", "sales": 98000,  "open_weekends": false},
+  {"store": "S03", "region": "West",  "sales": 143500, "open_weekends": true}
+]', "data/stores.json")
+```
+
+When every record has the same fields, `fromJSON()` returns a data frame:
+
+```{r}
+#| label: read-json
+
+stores <- fromJSON("data/stores.json")
+stores
+str(stores)
+```
+
+JSON can also be **nested**: records inside records. Then `fromJSON()` returns a **list** (Session 2), and you pull out the part you need:
+
+```{r}
+#| label: nested-json
+
+writeLines('{
+  "company": "Acme Corp",
+  "fiscal_year": 2025,
+  "stores": [
+    {"store": "S01", "sales": 125000},
+    {"store": "S02", "sales": 98000}
+  ]
+}', "data/company.json")
+
+company <- fromJSON("data/company.json")
+str(company)
+company$stores                      # a data frame inside the list
+```
+
+# R's Own Formats: RDS and RData {#sec-rds}
+
+CSV and Excel store text and numbers only. They forget everything else you did in R: factor levels and reference levels, dates, column types. R's own formats keep the object **exactly** as it is.
+
+## RDS: One Object {#sec-saverds}
+
+```{r}
+#| label: rds-demo
+
+customers$region <- factor(customers$region, levels = c("South", "East", "West"))
+levels(customers$region)
+
+# Through CSV: the factor and its level order are lost
+write.csv(customers, "data/customers_clean.csv", row.names = FALSE)
+class(read.csv("data/customers_clean.csv")$region)
+
+# Through RDS: everything is kept
+saveRDS(customers, "data/customers_clean.rds")
+customers_back <- readRDS("data/customers_clean.rds")
+levels(customers_back$region)
+class(customers_back$signup_date)
+```
+
+`readRDS()` returns the object, so you choose its name when you load it.
+
+## RData: Several Objects {#sec-rdata}
+
+`save()` stores several objects in one `.RData` (or `.rda`) file, and `load()` puts them all back under their **original names**:
+
+```{r}
+#| label: rdata-demo
+
+save(customers, stores, file = "data/session4_objects.RData")
+
+rm(customers, stores)                                  # remove them from memory
+load("data/session4_objects.RData")           # both are back
+exists("customers")
+```
+
+::: {.callout-warning}
+## Prefer RDS
+`load()` silently **overwrites** any objects in your Environment with the same names, and you cannot tell what a `.RData` file contains without loading it. `readRDS()` makes you name the result, which is clearer. Use RDS for saving your work, and `save()` only when you truly need several objects in one file.
+:::
+
+| | CSV | RDS | RData |
+|---|---|---|---|
+| Opens in Excel, Stata, Python | Yes | No | No |
+| Keeps factors, dates, types | No | Yes | Yes |
+| Objects per file | One table | One object | Several |
+| Load with | `read.csv()` | `x <- readRDS()` | `load()` |
+| Best for | Sharing with others | Saving your own cleaned data | Rarely |
+
+A good habit: keep the **raw** data exactly as you received it, write a script that cleans it, and save the cleaned result as RDS in `output/` (Session 1). Anyone can then reproduce the cleaned data from the raw file.
+
+To share data with someone who uses Excel, `writexl::write_xlsx(customers, "output/customers.xlsx")` writes an Excel file.
+
+# Databases {#sec-databases}
+
+Company data usually lives in a **database** (PostgreSQL, SQL Server, Oracle, Snowflake, ...), queried with SQL. R talks to all of them the same way:
+
+- **`DBI`** is R's standard interface: one set of functions for connecting, listing tables, and running queries, whatever the database
+- **`duckdb`** is a database that runs **inside R**, with no server to install, so you can practice on your own laptop
+
+## Connecting and Querying {#sec-sql}
+
+```{r}
+#| label: duckdb-connect
+
+con <- dbConnect(duckdb::duckdb())        # an in-memory database
+
+dbWriteTable(con, "customers", customers) # copy a data frame into the database
+dbListTables(con)
+```
+
+Now query it with SQL. `dbGetQuery()` sends the query and returns the result as a data frame:
+
+```{r}
+#| label: duckdb-query
+
+dbGetQuery(con, "
+  SELECT region,
+         COUNT(*)   AS n_customers,
+         AVG(spend) AS avg_spend
+  FROM customers
+  GROUP BY region
+  ORDER BY avg_spend DESC
+")
+```
+
+## Querying a CSV File Directly {#sec-duckdb-csv}
+
+DuckDB can run SQL on a CSV file **without importing it into R first**. For a file too large to fit in memory, this is often the easiest solution:
+
+```{r}
+#| label: duckdb-csv
+
+finance_path <- "data/finance_example.csv"
+
+dbGetQuery(con, paste0("
+  SELECT Sector, COUNT(*) AS n_companies
+  FROM read_csv_auto('", finance_path, "')
+  GROUP BY Sector
+  ORDER BY n_companies DESC
+"))
+```
+
+Close the connection when you are done:
+
+```{r}
+#| label: duckdb-disconnect
+
+dbDisconnect(con)
+```
+
+::: {.callout-note}
+## Connecting to your organization's database
+Only the `dbConnect()` line changes. For example, PostgreSQL uses `dbConnect(RPostgres::Postgres(), host = ..., dbname = ..., user = ...)`; SQL Server and others typically use the `odbc` package. Ask your IT team for connection details, and never type passwords into a script you share. To keep a DuckDB database between sessions, give it a file: `dbConnect(duckdb::duckdb(), dbdir = "data/research.duckdb")`.
+:::
+
+If you know SQL, you will find the `dplyr` verbs in Sessions 5 and 6 familiar: they map closely onto `SELECT`, `WHERE`, and `GROUP BY`.
+
+# A First Look After Any Import {#sec-check}
+
+Whatever the format, check every dataset before you analyze it. A checklist:
+
+| Question | Code |
+|----------|------|
+| How big is it? | `dim(x)` |
+| What are the columns and their types? | `str(x)`, or `map_chr(x, \(col) class(col)[1])` |
+| What do the first rows look like? | `head(x)` |
+| Are the ranges sensible? | `summary(x)` |
+| How many values are missing in each column? | `colSums(is.na(x))` |
+| Any missing-value codes hiding as numbers? | `summary()`: look for 99, -9, 999 |
+| Are categories spelled consistently? | `table(x$column)` |
+
+```{r}
+#| label: first-look
+
+dim(customers_back)
+str(customers_back)
+summary(customers_back)
+colSums(is.na(customers_back))
+table(customers_back$region)
+```
+
+For the finance data, with hundreds of columns, look at a few at a time:
+
+```{r}
+#| label: first-look-finance
+
+summary(finance_raw[, c("revenue", "cost_of_revenue", "price_var_2015")])
+table(finance_raw$sector)
+```
+
+# Your Turn {#sec-your-turn}
+
+::: {.callout-important}
+## Exercise
+An HR system exported the file created below. It has one note line above the header. Salaries include `$` and `,`. In the engagement column (a 1-to-5 scale), `-9` means "Not answered".
+
+1. Open the file in the **Files** pane (View File) and look at the raw text.
+2. Read it with `read.csv()`, skipping the note line and keeping the original column names.
+3. Rename the columns to `employee_id`, `department`, `salary`, `engagement`, and `hire_date`.
+4. Convert `salary` to a number and `hire_date` to a Date.
+5. Replace `-9` in `engagement` with `NA`. How many engagement values are missing?
+6. Run the first-look checklist (@sec-check). What is the average salary by department? (Hint: `tapply()`.)
+7. Save the cleaned data as `output/employees_clean.rds`, read it back, and check that `hire_date` is still a Date.
+8. **Bonus (finance data):** using DuckDB, find the five sectors with the highest average `Revenue` in `finance_example.csv`.
+:::
+
+```{r}
+#| label: exercise-data
+
+writeLines(c(
+  "HR export (run 2026-11-09)",
+  "Employee #,Dept.,Salary (USD),Engagement (1-5),Hire Date",
+  'E101,Sales,"$68,000",4,05/01/2023',
+  'E102,HR,"$72,500",-9,11/14/2016',
+  'E103,IT,"$95,000",2,08/20/2025',
+  'E104,Sales,"$61,250",5,11/04/2019',
+  'E105,IT,"$102,000",-9,01/12/2026',
+  'E106,HR,"$70,000",3,01/03/2022'
+), "data/hr_export.csv")
+```
+
+```{r}
+#| label: exercise-starter
+#| eval: false
+
+# 2. Read the file
+
+
+# 3. Rename the columns
+
+
+# 4. salary and hire_date
+
+
+# 5. Missing engagement
+
+
+# 6. First look and average salary by department
+
+
+# 7. Save and reload
+
+
+# 8. Bonus
+```
+
+::: {.callout-tip collapse="true"}
+## Solution (click to expand)
+```{r}
+#| label: exercise-solution
+
+# 2.
+hr <- read.csv("data/hr_export.csv", skip = 1, check.names = FALSE)
+
+# 3.
+hr <- rename(hr,
+             employee_id = `Employee #`,
+             department  = Dept.,
+             salary      = `Salary (USD)`,
+             engagement  = `Engagement (1-5)`,
+             hire_date   = `Hire Date`)
+
+# 4.
+hr$salary    <- as.numeric(gsub("[$,]", "", hr$salary))
+hr$hire_date <- mdy(hr$hire_date)
+
+# 5.
+hr$engagement[hr$engagement == -9] <- NA
+sum(is.na(hr$engagement))
+
+# 6.
+str(hr)
+summary(hr)
+tapply(hr$salary, hr$department, mean)
+
+# 7.
+dir.create("output", showWarnings = FALSE)
+saveRDS(hr, "output/employees_clean.rds")
+hr_back <- readRDS("output/employees_clean.rds")
+class(hr_back$hire_date)
+
+# 8.
+con <- dbConnect(duckdb::duckdb())
+dbGetQuery(con, paste0("
+  SELECT Sector, AVG(Revenue) AS avg_revenue
+  FROM read_csv_auto('", "data/finance_example.csv", "')
+  GROUP BY Sector
+  ORDER BY avg_revenue DESC
+  LIMIT 5
+"))
+dbDisconnect(con)
+```
+:::
+
+# Summary {#sec-summary}
+
+- **Find, read, check:** every import follows these three steps (@sec-formats).
+- **Keep raw data in `data/`**, whether downloaded with a browser or `download.file()`, and read it with a relative path such as `"data/finance_example.csv"` (@sec-download).
+- **`read.csv()` arguments fix most messy files:** `skip`, `na.strings`, and `check.names = FALSE`; then rename columns to short `snake_case` names (@sec-csv).
+- **Recode missing-value codes column by column**, never with a global `na.strings = "99"` (@sec-messy-csv).
+- **`read_excel()`** reads one sheet at a time; use `sheet`, `skip`, and `range` to get just the data (@sec-excel).
+- **`fromJSON()`** returns a data frame for flat JSON and a list for nested JSON (@sec-json).
+- **Save cleaned data as RDS** to keep types and factor levels; use CSV to share (@sec-rds).
+- **`DBI` + `duckdb`** let you query databases, and even CSV files, with SQL (@sec-databases).
+
+**Next session:** data wrangling with `dplyr`.
+
+## Further Reading
+
+- [R for Data Science (2e): Data import](https://r4ds.hadley.nz/data-import.html)
+- [R for Data Science (2e): Spreadsheets](https://r4ds.hadley.nz/spreadsheets.html)
+- [R for Data Science (2e): Databases](https://r4ds.hadley.nz/databases.html)
+- [readxl documentation](https://readxl.tidyverse.org/)
+- [DuckDB R client](https://duckdb.org/docs/api/r)
