@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="R Workshop for DBA Students">
+    <meta name="author" content="Taikgun Song <songt@ufl.edu>">
+    <title>R Workshop for DBA Students: Taikgun Song</title>
+    <!-- Bootstrap core CSS (same files as the previous workshop site) -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/extra.css" rel="stylesheet">
+  </head>
+  <body>
+
+    <div class="container">
+      <!-- Static navbar -->
+      <nav class="navbar navbar-default">
+        <div class="container-fluid">
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+          </div>
+          <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+              <li><a href="index.html">HOME</a></li>
+              <li class="active"><a href="schedule.html">Schedule</a></li>
+            </ul>
+          </div><!--/.nav-collapse -->
+        </div><!--/.container-fluid -->
+      </nav>
+
+      <h2>Workshop Topics</h2>
+
+      <!-- PLACEHOLDER: replace "#" with the data file's location -->
+      <p>
+        Data set used in Sessions 4&ndash;8:
+        <a href="#">finance_example.csv</a>.
+        Download it into the <code>data/</code> folder of your workshop RStudio Project (see Session 4).
+      </p>
+
+      <!--
+        PLACEHOLDER LINKS
+        - Lecture notes: each session has an HTML handout (rendered from sessionN.qmd) and
+          PDF slides (rendered from sessionN-slides.qmd). The paths below assume one folder
+          per session, e.g. session1/session1.html and session1/session1-slides.pdf.
+          Change them if you organize the files differently.
+        - Video recordings: replace "#" with each recording's link.
+      -->
+      <div class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Session</th>
+              <th>Topic</th>
+              <th>Lecture Notes</th>
+              <th>Video Recordings</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <tr>
+              <td>Session 1: Setting Up R and RStudio</td>
+              <td>
+                <ul>
+                  <li>Installing R and RStudio (Windows, Mac with Apple silicon or Intel)</li>
+                  <li>A tour of RStudio and settings for reproducible work</li>
+                  <li>Installing and loading packages</li>
+                  <li>Working directories, file paths, and RStudio Projects</li>
+                  <li>Your first Quarto document</li>
+                  <li>Getting help and reading error messages</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="session1/session1.html">Session 1 Lecture Notes</a></li>
+                  <li><a href="session1/session1-slides.pdf">Session 1 Slides (PDF)</a></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="#">Session 1 Recording</a></li>
+                </ul>
+              </td>
+            </tr>
+
+            <tr>
+              <td>Session 2: Data Types and Structures</td>
+              <td>
+                <ul>
+                  <li>Why data types matter: coded categories and Likert items</li>
+                  <li>Basic types, factors, dates, and date-times</li>
+                  <li>Factors and reference levels</li>
+                  <li>Vectors, matrices, arrays, data frames, and lists</li>
+                  <li>Factors in a regression model</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="session2/session2.html">Session 2 Lecture Notes</a></li>
+                  <li><a href="session2/session2-slides.pdf">Session 2 Slides (PDF)</a></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="#">Session 2 Recording</a></li>
+                </ul>
+              </td>
+            </tr>
+
+            <tr>
+              <td>Session 3: Operators, Functions, and Loops</td>
+              <td>
+                <ul>
+                  <li>Arithmetic, comparison, and logical operators</li>
+                  <li>Using and writing functions</li>
+                  <li>Decisions: <code>if</code>/<code>else</code>, <code>if_else()</code>, <code>case_when()</code></li>
+                  <li>Loops and <code>purrr::map()</code></li>
+                  <li>The pipe <code>|&gt;</code></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="session3/session3.html">Session 3 Lecture Notes</a></li>
+                  <li><a href="session3/session3-slides.pdf">Session 3 Slides (PDF)</a></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="#">Session 3 Recording</a></li>
+                </ul>
+              </td>
+            </tr>
+
+            <tr>
+              <td>Session 4: Importing and Saving Data</td>
+              <td>
+                <ul>
+                  <li>Getting a data file into your project</li>
+                  <li>Reading CSV and Excel files, including messy ones</li>
+                  <li>Reading JSON files</li>
+                  <li>Saving data: RDS and RData</li>
+                  <li>Querying databases with SQL (DBI and DuckDB)</li>
+                  <li>A first-look checklist after any import</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="session4/session4.html">Session 4 Lecture Notes</a></li>
+                  <li><a href="session4/session4-slides.pdf">Session 4 Slides (PDF)</a></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="#">Session 4 Recording</a></li>
+                </ul>
+              </td>
+            </tr>
+
+            <tr>
+              <td>Session 5: Data Wrangling with <code>dplyr</code></td>
+              <td>
+                <ul>
+                  <li>Looking at data: <code>glimpse()</code> and <code>View()</code></li>
+                  <li><code>select()</code>, <code>filter()</code>, <code>arrange()</code>, <code>mutate()</code></li>
+                  <li>Summaries by group: <code>group_by()</code> and <code>summarise()</code></li>
+                  <li><code>across()</code>: one function, many columns</li>
+                  <li>Finding data problems before analysis</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="session5/session5.html">Session 5 Lecture Notes</a></li>
+                  <li><a href="session5/session5-slides.pdf">Session 5 Slides (PDF)</a></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="#">Session 5 Recording</a></li>
+                </ul>
+              </td>
+            </tr>
+
+            <tr>
+              <td>Session 6: Combining, Reshaping, and Cleaning Data</td>
+              <td>
+                <ul>
+                  <li>Tidy data</li>
+                  <li>Stacking tables and joins</li>
+                  <li>Reshaping: <code>pivot_longer()</code> and <code>pivot_wider()</code></li>
+                  <li>Recoding values</li>
+                  <li>Missing data: find, drop, replace, and impute</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="session6/session6.html">Session 6 Lecture Notes</a></li>
+                  <li><a href="session6/session6-slides.pdf">Session 6 Slides (PDF)</a></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="#">Session 6 Recording</a></li>
+                </ul>
+              </td>
+            </tr>
+
+            <tr>
+              <td>Session 7: Visualizing Data</td>
+              <td>
+                <ul>
+                  <li>Quick looks with base R plots</li>
+                  <li>The grammar of graphics with <code>ggplot2</code></li>
+                  <li>Histograms, scatter plots, and side-by-side boxplots</li>
+                  <li>Zooming without dropping data</li>
+                  <li>Facets and publication-ready figures</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="session7/session7.html">Session 7 Lecture Notes</a></li>
+                  <li><a href="session7/session7-slides.pdf">Session 7 Slides (PDF)</a></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="#">Session 7 Recording</a></li>
+                </ul>
+              </td>
+            </tr>
+
+            <tr>
+              <td>Session 8: Descriptive Statistics, Models, and Tables</td>
+              <td>
+                <ul>
+                  <li>Summaries, cross-tabulations, and correlations</li>
+                  <li>Skewed variables and log transformations</li>
+                  <li>The formula interface</li>
+                  <li>Linear and logistic regression: <code>lm()</code> and <code>glm()</code></li>
+                  <li>Tables for papers, and rendering to Word</li>
+                  <li>Capstone: from raw file to report</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="session8/session8.html">Session 8 Lecture Notes</a></li>
+                  <li><a href="session8/session8-slides.pdf">Session 8 Slides (PDF)</a></li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li><a href="#">Session 8 Recording</a></li>
+                </ul>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div>
+    </div><!-- /.container -->
+
+    <script src="scripts/jquery.min.js"></script>
+    <script src="scripts/bootstrap.min.js"></script>
+  </body>
+</html>
