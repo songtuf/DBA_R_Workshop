@@ -19,11 +19,15 @@ format:
         \usepackage{etoolbox}
         % Smaller font for code and output so they fit on slides
         \AtBeginEnvironment{Shaded}{\scriptsize}
+        % Tables one size smaller than body text
+        \AtBeginEnvironment{longtable}{\footnotesize}
         \makeatletter
         \def\verbatim@font{\scriptsize\ttfamily}
         \makeatother
         % Outline slide at the start of each section
         \AtBeginSection[]{\begin{frame}{Outline}\tableofcontents[currentsection]\end{frame}}
+filters:
+  - small-output.lua   # smaller, gray R output (file must sit next to this one)
 execute:
   echo: true
   warning: true
@@ -86,6 +90,8 @@ library(carData)     # installed together with the car package
 
 install.packages(c("tidyverse", "car"))
 ```
+
+- This session uses `<-` to store values (`x <- 5`) and comparisons such as `==` and `>`. **Session 3** covers operators in detail
 
 # Why Data Types Matter {#sec-why}
 
@@ -173,7 +179,7 @@ table(department)
 ## Three Ways to Store a Likert Item
 
 | Store it as | Assumes | Common use |
-|-------------|---------|------------|
+|----------------|----------------------|--------------------------------------|
 | Numeric (1 to 5) | Equal spacing | Averaging items into a scale score |
 | Ordered factor | Order, unknown spacing | Sorting, tables, plots, ordinal models |
 | Unordered factor | Separate categories | Comparing specific groups |
@@ -204,7 +210,7 @@ satisfaction_f >= "Agree"   # comparisons work because the order is defined
 ## The Four Basic Types {#sec-basic-types}
 
 | Type | Example | Business example |
-|------|---------|------------------|
+|----------------|--------------|-----------------------------------------|
 | Logical | `TRUE`, `FALSE` | Did the customer renew? (only two values) |
 | Integer | `5L` | Number of employees |
 | Double (numeric) | `3.14` | Revenue, profit margin |
@@ -222,7 +228,7 @@ c(typeof(renewed), typeof(employees), typeof(revenue), typeof(dept))
 Each is a basic type with extra information attached, which R calls a **class**:
 
 | Kind of data | Class | Stored underneath as | Example |
-|--------------|-------|----------------------|---------|
+|------------|---------|----------------------------|---------------|
 | Categorical | `factor` | Integer codes + labels | Department |
 | Date | `Date` | Days since 1970-01-01 | Hire date |
 | Date-time | `POSIXct` | Seconds since 1970-01-01 UTC | Order timestamp |
@@ -592,7 +598,7 @@ employees$department <- factor(employees$department)  # convert to factor
 employees$senior <- employees$tenure_years >= 5       # add a new column
 ```
 
-Preview of `dplyr` (Sessions 4 and 5): the same ideas, read like sentences
+Preview of `dplyr` (Sessions 5 and 6): the same ideas, read like sentences
 
 ```{r}
 #| label: df-dplyr-preview
@@ -723,7 +729,7 @@ all.equal(fitted(m_ref), fitted(m_onehot))
 ## Reference Coding vs. One-Hot Coding
 
 | | Reference coding | One-hot coding |
-|---|---|---|
+|-------------|----------------------------------|---------------------------------|
 | Formula | `salary ~ rank` | `salary ~ 0 + rank` |
 | Dummy columns | One per level, minus the reference | One per level |
 | Intercept | Mean of the reference level | None |
@@ -902,7 +908,7 @@ tapply(Salaries$salary, Salaries$discipline, mean)
 
 ## Next Session and Further Reading
 
-**Next session:** importing real-world data from CSV, Excel, SPSS, and Stata files
+**Next session:** operators, functions, and loops
 
 **Further reading**
 

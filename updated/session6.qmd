@@ -1,0 +1,717 @@
+---
+title: "Session 6: Combining, Reshaping, and Cleaning Data"
+subtitle: "R Workshop for DBA Students"
+author: "Taikgun Song"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    number-sections: true
+    code-copy: true
+    code-tools: true
+    embed-resources: true
+    grid:
+      body-width: 1100px   # main text column (Quarto default: 800px)
+      margin-width: 150px  # right margin, unused here (default: 250px)
+    tbl-colwidths: false   # let the browser size table columns to their contents
+execute:
+  echo: true
+  warning: true
+---
+
+<!--
+HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
+- Companion slides: session6-slides.qmd
+- BEFORE RENDERING: put finance_example.csv in data/ (as in Sessions 4 and 5).
+- Requires: tidyverse.
+- The tidy-data example tables (Energy 191/28, Utilities 54/41) are typed in by hand;
+  they match fin_clean on 2026-11-14.
+- Data facts mentioned in the text (checked 2026-11-14 against the GitHub copy):
+  fin_clean has 3,593 firms; income_tbl (revenue > 0) has 3,593 rows and market_tbl
+  (market cap not missing) has 3,510; 3,356 firms are in both, 237 only in income_tbl,
+  154 only in market_tbl. Firms with a missing market cap have a HIGHER median revenue
+  than firms with one. 15 columns follow the "10Y/5Y/3Y ... Growth (per Share)" pattern.
+- Super-sector groups follow Morningstar's Global Equity Classification Structure.
+-->
+
+::: {.callout-note}
+## Session Objectives
+
+By the end of this session, you will be able to:
+
+1. Explain what "tidy" data is, and why R works best with it
+2. Stack tables with `bind_rows()`
+3. Combine tables with joins, and catch the two classic join problems
+4. Reshape data between wide and long formats with `pivot_longer()` and `pivot_wider()`
+5. Recode values with `case_when()`, `na_if()`, and `forcats`
+6. Find missing data, and explain what dropping, replacing, and imputing do to your results
+:::
+
+```{r}
+#| label: setup
+#| warning: false   # hide 'package built under R version x.y.z' warnings
+#| message: false
+
+library(tidyverse)
+```
+
+We continue with the finance data from Session 5. This chunk rebuilds the working datasets `fin` and `fin_clean` from Session 5 so this document runs on its own:
+
+```{r}
+#| label: rebuild-data
+
+finance_raw <- read.csv("data/finance_example.csv", check.names = FALSE)
+names(finance_raw)[1] <- "ticker"
+finance_raw <- as_tibble(finance_raw)
+
+fin <- finance_raw |>
+  select(ticker,
+         sector            = Sector,
+         revenue           = Revenue,
+         revenue_growth    = `Revenue Growth`,
+         net_income        = `Net Income`,
+         net_margin        = `Net Profit Margin`,
+         dividend_ps       = `Dividend per Share`,
+         market_cap        = `Market Cap`,
+         debt_to_equity    = `Debt to Equity`,
+         price_change_2015 = `2015 PRICE VAR [%]`)
+
+fin_clean <- fin |>
+  filter(revenue > 0) |>
+  mutate(revenue_bn = revenue / 1e9,
+         price_up   = if_else(price_change_2015 > 0, "Up", "Down"))
+```
+
+# Tidy Data {#sec-tidy}
+
+`dplyr` and most of the tidyverse are built for **tidy data**, which follows three rules:
+
+1. Each **variable** is a column
+2. Each **observation** is a row
+3. Each **value** is a cell
+
+The rules sound obvious, but a lot of real data breaks them, usually because it was laid out for people to read rather than for analysis. Compare two layouts of the same numbers, the count of stocks that went up or down in 2015, by sector:
+
+:::: {.columns}
+::: {.column width="48%"}
+**Tidy (long)**: one row per sector and direction
+
+| sector | price_up | n |
+|--------|----------|---|
+| Energy | Down | 191 |
+| Energy | Up | 28 |
+| Utilities | Down | 54 |
+| Utilities | Up | 41 |
+:::
+::: {.column width="4%"}
+:::
+::: {.column width="48%"}
+**Untidy (wide)**: one variable, `price_up`, spread across column names
+
+| sector | Down | Up |
+|--------|------|----|
+| Energy | 191 | 28 |
+| Utilities | 54 | 41 |
+:::
+::::
+
+The wide table is easier for a person to read, and it is often the right format for a report. The long table is easier for R: "direction" is a column you can filter, group by, or map to a color in a plot. (These are two rows of the full table computed in @sec-wider.)
+
+Most of this session is about getting data **into** a tidy shape: combining pieces (@sec-bind, @sec-joins), reshaping (@sec-reshape), fixing values (@sec-recode), and dealing with what is missing (@sec-missing).
+
+# Stacking Tables with `bind_rows()` {#sec-bind}
+
+When the same kind of data arrives in several pieces, such as one export per year, region, or survey wave, `bind_rows()` stacks them on top of each other. Here we simulate two exports by splitting the data by sector. Suppose the energy export left out one column:
+
+```{r}
+#| label: bind-rows
+
+tech   <- fin_clean |> filter(sector == "Technology")
+energy <- fin_clean |> filter(sector == "Energy") |> select(-dividend_ps)
+
+both <- bind_rows(tech = tech, energy = energy, .id = "source")
+
+count(both, source)
+both |> filter(source == "energy") |> select(ticker, source, dividend_ps) |> head(3)
+```
+
+`bind_rows()` matches columns **by name**, not by position, and fills a column that is missing from one piece with `NA`. `.id` adds a column recording which piece each row came from, which you will want later when something looks odd.
+
+# Joins: Combining Tables by a Key {#sec-joins}
+
+A **join** combines two tables side by side, matching rows on a **key**: a column, such as `ticker` or `sector`, that identifies the same thing in both tables. If you have used VLOOKUP or XLOOKUP in Excel, or `JOIN` in SQL, you already know the idea.
+
+## A Lookup Join {#sec-lookup}
+
+Morningstar groups its 11 stock sectors into three **super sectors** according to how sensitive they are to the business cycle. The sector names in our data match Morningstar's exactly. Let us type the classification in as a small table with `tribble()`, which lets you write a table row by row:
+
+```{r}
+#| label: super-sectors
+
+super_sectors <- tribble(
+  ~sector,                  ~super_sector,
+  "Basic Materials",        "Cyclical",
+  "Consumer Cyclical",      "Cyclical",
+  "Financial Services",     "Cyclical",
+  "Real Estate",            "Cyclical",
+  "Consumer Defensive",     "Defensive",
+  "Healthcare",             "Defensive",
+  "Utilities",              "Defensive",
+  "Communication Services", "Sensitive",
+  "Energy",                 "Sensitive",
+  "Industrials",            "Sensitive",
+  "Technology",             "Sensitive"
+)
+```
+
+`left_join()` keeps every row of the first (left) table and adds the matching columns from the second:
+
+```{r}
+#| label: left-join
+
+fin_super <- fin_clean |>
+  left_join(super_sectors, join_by(sector))
+
+fin_super |> select(ticker, sector, super_sector) |> head(4)
+fin_super |> count(super_sector)
+```
+
+`join_by(sector)` says "match rows where `sector` is the same in both tables." If the key has different names in the two tables, write `join_by(sector == sector_name)`.
+
+::: {.callout-tip}
+## Check that every row found a match
+A typo in a lookup table ("Health Care" instead of "Healthcare") does not cause an error: those rows simply get `NA`. `anti_join()` (@sec-join-types) lists the rows that did **not** find a match. Zero rows is what you want to see:
+
+```{r}
+#| label: anti-check
+
+fin_clean |> anti_join(super_sectors, join_by(sector)) |> nrow()
+```
+:::
+
+## Joining a Summary Back to the Data {#sec-join-summary}
+
+A very common step in finance research is comparing each firm with its industry, for example an **industry-adjusted** margin: the firm's margin minus its sector's median margin. Compute the sector medians, then join them back to every firm:
+
+```{r}
+#| label: join-summary
+
+sector_medians <- fin_clean |>
+  group_by(sector) |>
+  summarise(sector_median_margin = median(net_margin, na.rm = TRUE))
+
+fin_adj <- fin_clean |>
+  left_join(sector_medians, join_by(sector)) |>
+  mutate(margin_vs_sector = net_margin - sector_median_margin)
+
+fin_adj |> select(ticker, sector, net_margin, sector_median_margin, margin_vs_sector) |> head(5)
+```
+
+(A grouped `mutate()` from Session 5 gives the same result in one step. The join version is useful when the summary comes from somewhere else, such as an industry benchmark file.)
+
+## Four Kinds of Join {#sec-join-types}
+
+The joins differ in what happens to rows **without** a match. To see this, imagine our data came from two systems: an accounting system with income statement data, and a market data feed. A firm is in a table only if that system has data for it. (We simulate this by splitting the finance data.)
+
+```{r}
+#| label: two-systems
+
+income_tbl <- fin |>
+  filter(revenue > 0) |>
+  select(ticker, sector, revenue, net_income)
+
+market_tbl <- fin |>
+  filter(!is.na(market_cap)) |>
+  select(ticker, market_cap, price_change_2015)
+
+nrow(income_tbl)
+nrow(market_tbl)
+```
+
+```{r}
+#| label: join-types
+
+inner_join(income_tbl, market_tbl, join_by(ticker)) |> nrow()   # in both
+left_join(income_tbl, market_tbl, join_by(ticker)) |> nrow()    # all of income_tbl
+full_join(income_tbl, market_tbl, join_by(ticker)) |> nrow()    # in either
+anti_join(income_tbl, market_tbl, join_by(ticker)) |> nrow()    # income_tbl, but not market_tbl
+anti_join(market_tbl, income_tbl, join_by(ticker)) |> nrow()    # market_tbl, but not income_tbl
+```
+
+| Join | Keeps | Unmatched columns become |
+|------|-------|--------------------------|
+| `left_join(x, y)` | Every row of `x` | `NA` for `y`'s columns |
+| `inner_join(x, y)` | Only rows in **both** | (no unmatched rows) |
+| `full_join(x, y)` | Rows in **either** | `NA` on the side with no match |
+| `anti_join(x, y)` | Rows of `x` with **no** match in `y` | (only `x`'s columns) |
+
+`left_join()` is the one you will use most: start from your main table and add information to it, without losing any of its rows. `anti_join()` is the diagnostic: it tells you **which** firms did not match, so you can find out why before deciding whether it matters.
+
+```{r}
+#| label: anti-join-look
+
+income_tbl |>
+  anti_join(market_tbl, join_by(ticker)) |>
+  count(sector, sort = TRUE) |>
+  head(5)
+```
+
+| `dplyr` | Excel | SQL |
+|---------|-------|-----|
+| `left_join(x, y)` | VLOOKUP / XLOOKUP from `x` into `y` | `x LEFT JOIN y` |
+| `inner_join(x, y)` | (no direct equivalent) | `x INNER JOIN y` |
+| `full_join(x, y)` | (no direct equivalent) | `x FULL JOIN y` |
+| `anti_join(x, y)` | `#N/A` results of a lookup | `x LEFT JOIN y ... WHERE y.key IS NULL` |
+
+## When Keys Are Not Unique {#sec-duplicate-keys}
+
+A lookup table should have **one row per key**. Suppose someone accidentally added Technology twice:
+
+```{r}
+#| label: duplicate-keys
+
+super_sectors_dup <- bind_rows(super_sectors,
+                               tibble(sector = "Technology", super_sector = "Sensitive"))
+
+nrow(fin_clean)
+fin_clean |> left_join(super_sectors_dup, join_by(sector)) |> nrow()
+```
+
+Every Technology firm matched two rows, so it now appears **twice**, and every Technology statistic you compute afterwards is double-counted. `dplyr` warns you, but a warning is easy to miss in a long script.
+
+Two habits protect you:
+
+```{r}
+#| label: duplicate-keys-check
+#| error: true
+
+# 1. Check that the key is unique before joining
+super_sectors_dup |> count(sector) |> filter(n > 1)
+
+# 2. Tell the join what you expect: many firms per sector, one row per sector in the lookup
+fin_clean |> left_join(super_sectors_dup, join_by(sector), relationship = "many-to-one")
+```
+
+With `relationship = "many-to-one"`, the duplicate becomes an **error** that stops the script, instead of a warning that scrolls past.
+
+::: {.callout-important}
+## After every join, check the number of rows
+A `left_join()` should return exactly as many rows as its left table. If the number grew, a key was duplicated; if columns are full of `NA`, keys did not match. `nrow()` before and after takes two seconds and catches both.
+:::
+
+# Reshaping: Long and Wide {#sec-reshape}
+
+## `pivot_longer()`: Wide to Long {#sec-longer}
+
+The finance file has 15 columns like these, with two variables, the **time horizon** and the **metric**, built into each column name:
+
+```{r}
+#| label: growth-wide
+
+growth_wide <- finance_raw |>
+  select(ticker, sector = Sector,
+         matches("^(10|5|3)Y .* Growth \\(per Share\\)$"))
+
+names(growth_wide)[3:8]
+```
+
+In this shape, a question like "is long-run revenue growth higher than short-run growth?" means juggling three columns. In long format, `horizon` and `metric` are ordinary columns, and the question becomes a `group_by()`.
+
+`pivot_longer()` turns columns into rows:
+
+```{r}
+#| label: pivot-longer
+
+growth_long <- growth_wide |>
+  pivot_longer(cols          = -c(ticker, sector),          # columns to turn into rows
+               names_to      = c("horizon", "metric"),       # new columns from the old names
+               names_pattern = "^(\\d+Y) (.*) Growth \\(per Share\\)$",
+               values_to     = "growth",                     # new column for the values
+               values_drop_na = TRUE) |>                     # skip missing values
+  mutate(horizon = factor(horizon, levels = c("3Y", "5Y", "10Y")))
+
+growth_long
+```
+
+The `names_pattern` is a regular expression (see the strings elective). The two pieces in parentheses, `(\\d+Y)` and `(.*)`, are what goes into the two new columns: from `"10Y Revenue Growth (per Share)"`, the first piece is `10Y` and the second is `Revenue`. The `factor()` line orders the horizons from short to long rather than alphabetically (Session 2).
+
+Now the question is a short summary:
+
+```{r}
+#| label: long-summary
+
+growth_long |>
+  group_by(metric, horizon) |>
+  summarise(median_growth = median(growth), .groups = "drop")
+```
+
+Notice how many medians are exactly 0. For some metrics, `growth` is 0 for so many firms that you should ask whether 0 means "no growth" or "not reported." Reshaping often makes data questions like this visible.
+
+## `pivot_wider()`: Long to Wide {#sec-wider}
+
+`pivot_wider()` goes the other way, and is often the last step before a table goes into a report. The Session 5 count of stocks that went up or down:
+
+```{r}
+#| label: pivot-wider
+
+fin_clean |>
+  count(sector, price_up) |>
+  pivot_wider(names_from = price_up, values_from = n) |>
+  mutate(share_up = Up / (Up + Down)) |>
+  arrange(share_up)
+```
+
+The same applies to the growth medians: one row per metric, one column per horizon:
+
+```{r}
+#| label: pivot-wider-growth
+
+growth_long |>
+  group_by(metric, horizon) |>
+  summarise(median_growth = median(growth), .groups = "drop") |>
+  pivot_wider(names_from = horizon, values_from = median_growth)
+```
+
+| Function | Key arguments |
+|----------|---------------|
+| `pivot_longer()` | `cols`: columns to turn into rows; `names_to`: new column(s) for the old names; `values_to`: new column for the values; `names_pattern` or `names_sep`: how to split the names; `values_drop_na` |
+| `pivot_wider()` | `names_from`: column whose values become column names; `values_from`: column whose values fill them; `values_fill`: value for missing combinations, e.g. `0` |
+
+::: {.callout-tip}
+## Which shape?
+Keep data **long** while you analyze and plot it; make it **wide** at the end, for tables people will read. If you are fighting `dplyr` or `ggplot2`, the data is probably in the wrong shape.
+:::
+
+# Recoding Values {#sec-recode}
+
+## Value Lookups with `case_when()` {#sec-case-when-lookup}
+
+`case_when()` from Session 3 recodes by condition, and a condition can simply test for a value. That makes it the tool for applying a data dictionary (Session 2):
+
+```{r}
+#| label: case-when-lookup
+
+size_code <- c(1, 3, 2, 2, 99, 1)          # 1 = Small, 2 = Mid, 3 = Large, 99 = unknown
+
+case_when(size_code == 1 ~ "Small cap",
+          size_code == 2 ~ "Mid cap",
+          size_code == 3 ~ "Large cap")
+```
+
+Any value that matches no condition becomes `NA`, like the `99` above. Add `.default` to give unmatched values something else instead.
+
+With `%in%`, one line can recode a whole group of values. Here is the super-sector classification from @sec-lookup, written as `case_when()` instead of a join:
+
+```{r}
+#| label: case-when-groups
+
+fin_clean |>
+  mutate(super_sector = case_when(
+    sector %in% c("Basic Materials", "Consumer Cyclical",
+                  "Financial Services", "Real Estate")       ~ "Cyclical",
+    sector %in% c("Consumer Defensive", "Healthcare", "Utilities") ~ "Defensive",
+    sector %in% c("Communication Services", "Energy",
+                  "Industrials", "Technology")                 ~ "Sensitive"
+  )) |>
+  count(super_sector)
+```
+
+Both work. A join is better when the mapping is long or is shared between several analyses, because the lookup table can live in its own file; `case_when()` is handy for a short mapping you use once.
+
+## Changing a Few Values {#sec-change-few}
+
+To change only some values and keep the rest, use `.default` with the column itself, so anything not listed stays as it was:
+
+```{r}
+#| label: case-when-default
+
+fin_clean |>
+  mutate(sector = case_when(sector == "Financial Services"     ~ "Financials",
+                            sector == "Communication Services" ~ "Communication",
+                            .default = sector)) |>
+  count(sector)
+```
+
+For a factor, `fct_recode()` from Session 2 does the same with `new = old` pairs:
+`fct_recode(sector, Financials = "Financial Services", Communication = "Communication Services")`.
+
+## Missing-Value Codes with `na_if()` {#sec-na-if}
+
+`na_if()` turns one specific value into `NA`. It is Session 3's `clean_missing()` in one line:
+
+```{r}
+#| label: na-if
+
+na_if(size_code, 99)
+```
+
+`na_if()` handles one code at a time. For several codes, call it twice, or use `case_when()`:
+
+```{r}
+#| label: na-if-two
+
+codes <- c(4, 98, 2, 99, 5)                 # 98 = "Don't know", 99 = "Refused"
+
+codes |> na_if(98) |> na_if(99)
+```
+
+| Function | Use it to | Unlisted values |
+|----------|-----------|-----------------|
+| `case_when()` | Recode by value or by condition | `NA`, or `.default` (use the column itself to keep them) |
+| `na_if()` | Turn one missing-value code into `NA` | Stay as they are |
+| `fct_recode()`, `fct_collapse()` | Rename or merge factor levels | Stay as they are |
+
+::: {.callout-note}
+## Newer functions
+`dplyr` 1.2.0 (2026) added `recode_values()` and `replace_values()` for value lookups. You may see them in newer code; they do the same jobs as the tools above.
+:::
+
+## Recoding Categories with `forcats` {#sec-forcats}
+
+The `forcats` functions from Session 2 work on any categorical column. One more is useful with many categories: `fct_lump_n()` keeps the `n` most common and groups the rest into "Other":
+
+```{r}
+#| label: fct-lump
+
+fin_clean |>
+  mutate(sector_top5 = fct_lump_n(sector, n = 5, other_level = "Other sectors")) |>
+  count(sector_top5, sort = TRUE)
+```
+
+This is handy for tables and plots, where 11 categories can be too many to read.
+
+# Missing Data {#sec-missing}
+
+Almost every real dataset has missing values. There is no single right way to handle them, but there are wrong ones, and the most common wrong one is not thinking about it at all.
+
+## Why Is It Missing? {#sec-why-missing}
+
+What you can safely do depends on **why** values are missing. Statisticians distinguish three situations:
+
+| Situation | Plain meaning | Example |
+|-----------|---------------|---------|
+| Missing completely at random | Missingness has nothing to do with anything | A survey page failed to load for random respondents |
+| Missing at random | Missingness is related to other things you **observed** | Smaller firms are less likely to report R&D, and you know firm size |
+| Missing not at random | Missingness is related to the **missing value itself** | High earners skip the income question |
+
+You can rarely prove which one you have, but you can look for clues. Are firms with a missing market cap different from the others?
+
+```{r}
+#| label: missing-pattern
+
+fin_clean |>
+  group_by(market_cap_missing = is.na(market_cap)) |>
+  summarise(n_firms        = n(),
+            median_revenue = median(revenue_bn))
+```
+
+They are: firms without a market cap have a **higher** median revenue. Whatever the reason (perhaps foreign firms or unusual share structures), the missing values are not a random sample. Any analysis that silently drops them describes a slightly different set of firms than you might think.
+
+## Find {#sec-find-missing}
+
+Count the missing values in every column, using `across()` (Session 5) and `pivot_longer()` (@sec-longer) to turn the result into an easy-to-read list:
+
+```{r}
+#| label: find-missing
+
+fin_clean |>
+  summarise(across(everything(), \(x) sum(is.na(x)))) |>
+  pivot_longer(everything(), names_to = "column", values_to = "n_missing") |>
+  arrange(desc(n_missing))
+```
+
+How many rows have no missing values at all?
+
+```{r}
+#| label: complete-rows
+
+sum(complete.cases(fin_clean))
+nrow(fin_clean)
+```
+
+## Drop {#sec-drop}
+
+`drop_na()` removes rows with missing values. **Which columns** you give it matters a lot:
+
+```{r}
+#| label: drop-na
+
+fin_clean |> drop_na() |> nrow()                 # missing in ANY column
+fin_clean |> drop_na(market_cap) |> nrow()       # missing market cap only
+```
+
+Dropping on every column throws away firms that are missing a value you never use. Drop only on the columns in your analysis, and report how many observations you lost. Remember also that many functions drop missing values **for** you: `filter()` (Session 5), `na.rm = TRUE`, and model functions like `lm()`, which use only complete rows. Two analyses on "the same data" can quietly use different firms.
+
+## Replace {#sec-replace}
+
+Replace a missing value only when you **know** what it means. For example, if you know a missing dividend means the firm paid none, `replace_na()` fills it in:
+
+```{r}
+#| label: replace-na
+
+fin_clean |>
+  mutate(dividend_ps = replace_na(dividend_ps, 0)) |>
+  summarise(n_missing = sum(is.na(dividend_ps)))
+```
+
+If you are **not** sure that missing means zero, this quietly turns "unknown" into "none" and biases everything computed from the column.
+
+`coalesce()` fills gaps from a second source: it takes the first non-missing value, position by position. For example, use the reported value, and if it is missing, a value from another database:
+
+```{r}
+#| label: coalesce
+
+reported    <- c(1.20, NA, 0.85, NA)
+from_backup <- c(1.25, 0.40, 0.80, NA)
+
+coalesce(reported, from_backup)
+```
+
+## Impute {#sec-impute}
+
+**Imputation** fills missing values with estimates. The simplest version replaces each missing value with the median of the observed ones. It is easy to do, and it is worth seeing what it does to the data:
+
+```{r}
+#| label: impute-median
+
+fin_imp <- fin_clean |>
+  mutate(revenue_growth_was_missing = is.na(revenue_growth),
+         revenue_growth_imputed     = if_else(is.na(revenue_growth),
+                                              median(revenue_growth, na.rm = TRUE),
+                                              revenue_growth))
+
+fin_imp |>
+  summarise(n_missing_before = sum(is.na(revenue_growth)),
+            n_missing_after  = sum(is.na(revenue_growth_imputed)),
+            iqr_before       = IQR(revenue_growth, na.rm = TRUE),
+            iqr_after        = IQR(revenue_growth_imputed))
+```
+
+The missing values are gone, but every imputed firm now sits **exactly at the median**, and the spread of the data (here, the interquartile range) has shrunk. Statistics computed from the imputed column look more certain than they really are, because the imputed values carry no uncertainty at all.
+
+Two habits if you do impute:
+
+- **Keep a flag column**, like `revenue_growth_was_missing`, so you always know which values are real
+- **Impute within groups** when groups differ: `group_by(sector)` before the `mutate()` uses each sector's own median
+
+Principled approaches, such as **multiple imputation**, create several plausible versions of the data and combine the results, so the uncertainty is not lost. They are covered in your statistics course.
+
+| Approach | What it does | Main risk |
+|----------|--------------|-----------|
+| Drop | Analyze complete rows only | Smaller sample; biased if the dropped rows differ |
+| Replace | Fill with a known value | Wrong if "missing" does not really mean that value |
+| Simple imputation | Fill with a median or mean | Shrinks variability; results look more certain than they are |
+| Multiple imputation | Several plausible fills, results combined | More work; covered in the statistics course |
+
+::: {.callout-important}
+## Whatever you choose, write it down
+How you handled missing data is a methods decision that reviewers will ask about. Do it in code, keep the raw data unchanged, and report how many values were missing and what you did with them.
+:::
+
+# Your Turn {#sec-your-turn}
+
+::: {.callout-important}
+## Exercise
+Use `fin_clean`, `super_sectors`, `income_tbl`, `market_tbl`, and `growth_long` from this session.
+
+1. **Super sectors.** Join `super_sectors` to `fin_clean`. Check that the number of rows did not change. For each super sector, compute the number of firms, the median net margin, and the share of stocks that went up in 2015. Which super sector did best?
+2. **Missing market data.** Which firms are in `income_tbl` but not in `market_tbl`? Count them by sector and sort.
+3. **Growth by horizon.** From `growth_long`, keep only the `Revenue` metric. Compute the median growth by `sector` and `horizon`, then use `pivot_wider()` to make one column per horizon.
+4. **Recoding.** Use `case_when()` with `.default` to shorten `"Consumer Cyclical"` to `"Cyclical"` and `"Consumer Defensive"` to `"Defensive"`. Then use `fct_lump_n()` to keep the 4 largest sectors and count firms in each.
+5. **Missing data.** How many `debt_to_equity` values are missing in each sector? Impute them with each **sector's** median (hint: `group_by()` before `mutate()`), keeping a flag column. Compare the IQR of `debt_to_equity` before and after imputation for each sector.
+:::
+
+```{r}
+#| label: exercise-starter
+#| eval: false
+
+# 1. Super sectors
+
+
+# 2. Missing market data
+
+
+# 3. Growth by horizon
+
+
+# 4. Recoding
+
+
+# 5. Missing data
+```
+
+::: {.callout-tip collapse="true"}
+## Solution (click to expand)
+```{r}
+#| label: exercise-solution
+
+# 1.
+fin_super <- fin_clean |> left_join(super_sectors, join_by(sector))
+nrow(fin_clean) == nrow(fin_super)
+
+fin_super |>
+  group_by(super_sector) |>
+  summarise(n_firms       = n(),
+            median_margin = median(net_margin, na.rm = TRUE),
+            share_up      = mean(price_change_2015 > 0)) |>
+  arrange(desc(share_up))
+
+# 2.
+income_tbl |>
+  anti_join(market_tbl, join_by(ticker)) |>
+  count(sector, sort = TRUE)
+
+# 3.
+growth_long |>
+  filter(metric == "Revenue") |>
+  group_by(sector, horizon) |>
+  summarise(median_growth = median(growth), .groups = "drop") |>
+  pivot_wider(names_from = horizon, values_from = median_growth)
+
+# 4.
+fin_clean |>
+  mutate(sector = case_when(sector == "Consumer Cyclical"  ~ "Cyclical",
+                            sector == "Consumer Defensive" ~ "Defensive",
+                            .default = sector),
+         sector = fct_lump_n(sector, n = 4)) |>
+  count(sector, sort = TRUE)
+
+# 5.
+fin_clean |>
+  group_by(sector) |>
+  summarise(n_missing = sum(is.na(debt_to_equity)))
+
+fin_de <- fin_clean |>
+  group_by(sector) |>
+  mutate(de_was_missing = is.na(debt_to_equity),
+         de_imputed     = if_else(is.na(debt_to_equity),
+                                  median(debt_to_equity, na.rm = TRUE),
+                                  debt_to_equity)) |>
+  ungroup()
+
+fin_de |>
+  group_by(sector) |>
+  summarise(iqr_before = IQR(debt_to_equity, na.rm = TRUE),
+            iqr_after  = IQR(de_imputed))
+```
+:::
+
+# Summary {#sec-summary}
+
+- **Tidy data:** variables in columns, observations in rows. Analyze long, report wide (@sec-tidy, @sec-reshape).
+- **`bind_rows()`** stacks tables by column name; `.id` records where each row came from (@sec-bind).
+- **Joins** combine tables by a key. `left_join()` is the workhorse; `anti_join()` finds what did not match (@sec-joins).
+- **After every join, check the row count.** Duplicate keys multiply rows; `relationship = "many-to-one"` turns that into an error (@sec-duplicate-keys).
+- **`pivot_longer()`** turns columns into rows, and can split column names into variables; **`pivot_wider()`** goes back (@sec-reshape).
+- **`case_when()`** recodes by value or condition (use `.default = column` to keep unlisted values); **`na_if()`** turns a missing-value code into `NA` (@sec-recode).
+- **Missing data:** ask why it is missing; find it; drop only on the columns you use; replace only when you know the meaning; imputation fills gaps but hides uncertainty. Document every choice (@sec-missing).
+
+**Next session:** visualization with `ggplot2`.
+
+## Further Reading
+
+- [R for Data Science (2e): Data tidying](https://r4ds.hadley.nz/data-tidy.html)
+- [R for Data Science (2e): Joins](https://r4ds.hadley.nz/joins.html)
+- [R for Data Science (2e): Missing values](https://r4ds.hadley.nz/missing-values.html)

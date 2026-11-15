@@ -50,11 +50,6 @@ By the end of this session, you will be able to:
 
 A useful analogy: **R is the engine, RStudio is the dashboard.** You need both, and you install them separately. You will almost never open R by itself; you open RStudio, and RStudio runs R for you.
 
-::: {.callout-note}
-## Other editors
-RStudio is made by a company called Posit, which also makes a newer editor called **Positron**. We use RStudio in this course because most textbooks, tutorials, and your statistics course assume it. Everything you learn here carries over if you switch later.
-:::
-
 # Installing R and RStudio {#sec-install}
 
 Install **R first**, then RStudio.
@@ -73,6 +68,14 @@ R comes in different versions for different processors. Installing the wrong one
 If you have an Apple silicon Mac with an older macOS, update macOS first. As of November 2026 (R 4.6.2), the Intel (`x86_64`) installer needs macOS 11 or later.
 
 Do **not** install the Intel version on an Apple silicon Mac. It will run through Apple's Rosetta translation layer, which is slower, and some packages will fail to install in confusing ways.
+
+After installing (@sec-install-r), check which version you have by typing this in the RStudio **Console**:
+
+```r
+R.version$arch    # "aarch64" = Apple silicon, "x86_64" = Intel
+```
+
+On an Apple silicon Mac it must say `"aarch64"`. If it says `"x86_64"`, uninstall R and install the `arm64` version.
 :::
 
 ## Step 2: Install R {#sec-install-r}
@@ -82,6 +85,11 @@ Do **not** install the Intel version on an Apple silicon Mac. It will run throug
 3. **Windows:** click **base**, then **Download R-4.x.x for Windows**. Run the installer and accept the defaults.
 4. **Mac:** download the `.pkg` file that matches your chip from @sec-know-computer. Open it and accept the defaults.
 
+::: {.callout-tip}
+## Keep R up to date
+A new version of R comes out every April, with bug-fix releases during the year. Updating R means installing the new version over the old one. After a major update (e.g. 4.5 → 4.6), you will need to reinstall your packages.
+:::
+
 ## Step 3: Install RStudio {#sec-install-rstudio}
 
 1. Go to <https://posit.co/download/rstudio-desktop/>
@@ -90,23 +98,9 @@ Do **not** install the Intel version on an Apple silicon Mac. It will run throug
 
 RStudio comes with **Quarto** built in, so there is nothing else to install for writing documents.
 
-## Step 4: Check Your Installation {#sec-check}
-
-Open RStudio. In the **Console** pane (bottom left), type each line below and press Enter:
-
-```{r}
-#| label: check-install
-
-R.version.string          # which version of R
-R.version$arch            # "aarch64" = Apple silicon / ARM, "x86_64" = Intel/AMD
-Sys.info()[["sysname"]]   # "Windows" or "Darwin" (macOS)
-```
-
-On an Apple silicon Mac, `R.version$arch` must say `"aarch64"`. If it says `"x86_64"`, you installed the Intel version: uninstall it and install the `arm64` version.
-
-::: {.callout-tip}
-## Keep R up to date
-A new version of R comes out every April, with bug-fix releases during the year. Updating R means installing the new version over the old one. After a major update (e.g. 4.5 → 4.6), you will need to reinstall your packages.
+::: {.callout-note}
+## Alternative: Positron
+Posit, the company that makes RStudio, also makes a newer editor called [Positron](https://positron.posit.co/), which works with both R and Python. We use RStudio in this course because most textbooks, tutorials, and your statistics course assume it. Everything you learn here carries over if you switch later.
 :::
 
 ## Windows on ARM {#sec-windows-arm}
@@ -121,6 +115,16 @@ Most packages arrive ready-made ("binary"), so you do not need anything else. Oc
 - **Mac:** Apple's Command Line Tools. Open the Terminal app and run `xcode-select --install`
 
 You do **not** need these for this workshop. Install them only if an error message tells you to.
+
+If you do install them, this optional check confirms that R can find them:
+
+```{r}
+#| label: check-build-tools
+#| eval: false
+
+install.packages("pkgbuild")
+pkgbuild::has_build_tools(debug = TRUE)   # TRUE = ready to compile packages
+```
 
 ## Posit Cloud: A Backup Option {#sec-cloud}
 
@@ -156,8 +160,6 @@ Write anything you want to keep in a **script** or Quarto document and run it fr
 | Run the whole script | `Ctrl` + `Shift` + `Enter` | `Cmd` + `Shift` + `Return` |
 | New R script | `Ctrl` + `Shift` + `N` | `Cmd` + `Shift` + `N` |
 | Comment / uncomment lines | `Ctrl` + `Shift` + `C` | `Cmd` + `Shift` + `C` |
-| Insert `<-` | `Alt` + `-` | `Option` + `-` |
-| Insert pipe `|>` | `Ctrl` + `Shift` + `M` | `Cmd` + `Shift` + `M` |
 | Clear the Console | `Ctrl` + `L` | `Ctrl` + `L` |
 | Stop running code | `Esc` | `Esc` |
 | Show all shortcuts | `Alt` + `Shift` + `K` | `Option` + `Shift` + `K` |
@@ -170,7 +172,6 @@ Open **Tools → Global Options** and change the following:
 |----------|---------|-----------|-----|
 | General → Basic | Restore .RData into workspace at startup | **Unchecked** | Start every session clean |
 | General → Basic | Save workspace to .RData on exit | **Never** | Same reason |
-| Code → Editing | Use native pipe operator, `|>` | **Checked** | The shortcut inserts `|>`, used in this course |
 | Code → Saving | Default text encoding | **UTF-8** | Avoids garbled characters, especially in non-English text |
 
 ::: {.callout-important}
@@ -213,6 +214,8 @@ Or with the mouse: **Packages** pane → **Install** → type the package name.
 - *"Do you want to install from sources the packages which need compilation?"* → answer **no**. The ready-made version is usually only a few days older.
 :::
 
+`install.packages()` installs from **CRAN**, where every package is checked on every operating system. Packages can also come from other repositories, such as **GitHub** (packages in development, without CRAN's checks) or **Bioconductor** (bioinformatics), each with its own installation method.
+
 ## The Course Install List {#sec-course-packages}
 
 Run this once. It may take several minutes, because `tidyverse` installs many packages.
@@ -223,7 +226,7 @@ Run this once. It may take several minutes, because `tidyverse` installs many pa
 
 install.packages(c(
   "tidyverse",     # data wrangling and visualization (dplyr, ggplot2, forcats, lubridate, ...)
-  "here",          # file paths that work on every computer
+  "here",          # file paths from the project root (optional)
   "readxl",        # read Excel files
   "haven",         # read SPSS, Stata, and SAS files
   "car",           # regression tools; also installs the carData datasets
@@ -234,7 +237,7 @@ install.packages(c(
 ))
 ```
 
-Check that everything installed:
+Check that everything installed. The line starting with `course_pkgs <-` stores the list of names under `course_pkgs` so it can be reused; Session 3 explains `<-` and other operators in detail.
 
 ```{r}
 #| label: check-course-packages
@@ -251,6 +254,7 @@ Every value should be `TRUE`. For any `FALSE`, run `install.packages()` again fo
 
 ```{r}
 #| label: load-packages
+#| warning: false   # hide 'package built under R version x.y.z' warnings
 #| message: true
 
 library(tidyverse)
@@ -263,7 +267,7 @@ To use one function without loading its whole package, write `package::function(
 ```{r}
 #| label: double-colon
 
-here::here()          # works even if here is not loaded
+readxl::excel_sheets(readxl::readxl_example("datasets.xlsx"))   # works without library(readxl)
 ```
 
 The `::` form also makes it clear where a function comes from, which is helpful when reading other people's code.
@@ -283,23 +287,6 @@ update.packages(ask = FALSE)   # update everything (or Packages pane → Update)
 remove.packages("readxl")      # uninstall a package
 ```
 
-## Packages from GitHub {#sec-github}
-
-Packages that are new or still in development are often shared on GitHub instead of CRAN. Install them with the `remotes` package, using `"username/repository"`:
-
-```{r}
-#| label: github-install
-#| eval: false
-
-install.packages("remotes")
-remotes::install_github("RWorkshop-at-UF/pkg_example")
-
-library(welcome)
-GreetingsFrom("Tek")
-```
-
-CRAN checks every package on every operating system; GitHub packages have no such checks. Prefer the CRAN version when one exists.
-
 ## Which Packages Are Loaded? {#sec-session-info}
 
 ```{r}
@@ -314,7 +301,26 @@ sessionInfo()
 
 ## Folders and Paths {#sec-folders}
 
-Files on your computer are organized in a **tree** of folders (directories). A **path** is the address of a file in that tree:
+Files on your computer are organized in a **tree** of folders (directories). Each folder can contain files and more folders:
+
+```
+C:/                              ← the root: top of the tree (Mac: /)
+└── Users/
+    └── tek/                     ← your home folder (~)
+        └── Documents/
+            └── dba/             ← suppose this is the working directory
+                ├── analysis.qmd
+                └── data/
+                    └── survey.csv
+```
+
+A **path** is the address of a file in that tree: the list of folders you pass through to reach it, separated by `/`. There are two kinds:
+
+- An **absolute path** starts at the root and lists every folder on the way down: `C:/Users/tek/Documents/dba/data/survey.csv`
+- A **relative path** starts from the current folder. From `dba/`, the same file is simply `data/survey.csv`
+- A relative path can also go **up** the tree with `..`. From `data/`, the path `../analysis.qmd` means "go up one folder to `dba/`, then find `analysis.qmd`"
+
+On a Mac, the tree looks the same except that the root is `/` and there is no drive letter, so the absolute path is `/Users/tek/Documents/dba/data/survey.csv`.
 
 | Kind of path | Example | Meaning |
 |--------------|---------|---------|
@@ -375,7 +381,7 @@ An **RStudio Project** is a folder with a small `.Rproj` file inside it. When yo
 
 RStudio restarts inside the project. The project name appears at the top right of the window, and `getwd()` now returns the project folder. Next time, open the project by double-clicking its `.Rproj` file, or from **File → Recent Projects**.
 
-**A folder layout that works for most research projects:**
+**A folder layout that works for most research projects.** This is the same kind of tree as in @sec-folders, with the project folder at the top. Wherever the project folder sits on your computer, the paths inside it (such as `data/survey.csv`) stay the same.
 
 ```
 dba-r-workshop/
@@ -391,32 +397,35 @@ dba-r-workshop/
 Cloud-synced folders can lock files while R is using them and cause confusing errors. On Windows, **Documents** is often silently synced to OneDrive. A simple, safe location is a folder such as `C:/R-projects` (Windows) or `~/R-projects` (Mac). Use the cloud or Git for backups instead.
 :::
 
-## The `here` Package {#sec-here}
+## Relative Paths Inside a Project {#sec-relative}
 
-Inside a project, relative paths usually just work. There is one catch: a Quarto document uses **its own folder** as the working directory, which may not be the project folder if you keep documents in a subfolder. The `here` package solves this by always building paths from the **project root**, wherever your file is:
+Inside a project, write every path **relative to the folder your file is in**. With the layout above, a script or Quarto document at the top of the project reads its data with:
 
 ```{r}
-#| label: here-example
+#| label: relative-path
+#| eval: false
 
-library(here)
-
-here()                          # the project root
-here("data", "survey.csv")      # a path to data/survey.csv, correct on any computer
+read.csv("data/survey.csv")
 ```
 
-Notice that you give `here()` folder and file names separately, and it inserts the right separators for your operating system.
+This works on Windows and Mac, on your laptop and your coauthor's, because it never mentions anything outside the project folder. Quarto renders each document from **its own folder**, so keep your `.qmd` files at the top of the project, next to `data/`, as in the layout above.
+
+::: {.callout-note}
+## The `here` package
+If you organize a larger project with documents in subfolders (for example, `reports/chapter1.qmd`), relative paths from each document get awkward (`../data/survey.csv`). The `here` package builds paths from the **project root** instead, wherever the file is: `here::here("data", "survey.csv")`. It is optional for this workshop, and like many tools, worth exploring once you need it.
+:::
 
 ::: {.callout-tip}
 ## The habit to build
 1. One RStudio Project per research project
 2. Raw data in `data/`, never edited by hand
-3. Paths written with `here()`
+3. Paths written relative to the project folder, such as `"data/survey.csv"`
 4. No `setwd()` in scripts you keep
 :::
 
 # Accessing Files from R {#sec-files}
 
-You can explore and manage files without leaving R. The examples below create a `data/` folder and a small file inside your project.
+You can explore and manage files without leaving R. The examples below create a `data/` folder and a small file inside your project, using relative paths.
 
 ## Listing and Creating Files {#sec-list-files}
 
@@ -430,8 +439,8 @@ list.files(pattern = "\\.qmd$")      # only files ending in .qmd
 ```{r}
 #| label: create-files
 
-dir.create(here("data"), showWarnings = FALSE)   # create data/ (no warning if it exists)
-dir.exists(here("data"))
+dir.create("data", showWarnings = FALSE)   # create data/ (no warning if it exists)
+dir.exists("data")
 ```
 
 ## Writing and Reading a CSV File {#sec-csv}
@@ -447,10 +456,10 @@ sales <- data.frame(
   stores  = c(12, 9, 15, 8)
 )
 
-write.csv(sales, here("data", "sales.csv"), row.names = FALSE)
+write.csv(sales, "data/sales.csv", row.names = FALSE)
 
-file.exists(here("data", "sales.csv"))
-list.files(here("data"))
+file.exists("data/sales.csv")
+list.files("data")
 ```
 
 Open the `data` folder in the **Files** pane: `sales.csv` is there, and you can click it to view it. Now read it back:
@@ -458,7 +467,7 @@ Open the `data` folder in the **Files** pane: `sales.csv` is there, and you can 
 ```{r}
 #| label: read-csv
 
-sales_in <- read.csv(here("data", "sales.csv"))
+sales_in <- read.csv("data/sales.csv")
 sales_in
 ```
 
@@ -479,7 +488,7 @@ dim(sales_in)        # number of rows and columns
 View(sales_in)       # spreadsheet-style viewer (capital V)
 ```
 
-Session 3 covers reading Excel, SPSS, Stata, and messier CSV files in detail.
+Session 4 covers reading Excel, SPSS, Stata, and messier CSV files in detail.
 
 ::: {.callout-note}
 ## Deleting files from R
@@ -574,7 +583,7 @@ Error messages look intimidating but usually say exactly what is wrong. Some you
 | `could not find function "ggplot"` | Package not loaded | Run `library(ggplot2)` |
 | `there is no package called 'here'` | Package not installed | Run `install.packages("here")` |
 | `object 'sales' not found` | A typo, or the code that creates it was not run | Check spelling and capitalization; run the earlier lines |
-| `cannot open file 'data/sales.csv': No such file or directory` | Wrong path or working directory | Check `getwd()`, use `here()` |
+| `cannot open file 'data/sales.csv': No such file or directory` | Wrong path or working directory | Check `getwd()` and `list.files()`; is the file where the path says? |
 | `unexpected symbol` or `unexpected ')'` | A typo: missing comma, quote, or bracket | Look just before the position R points to |
 
 ::: {.callout-tip}
@@ -613,7 +622,7 @@ AI assistants are very good at explaining error messages and suggesting code. Us
 | "Would you like to use a personal library instead?" | No permission to write to the system library | Answer **yes** |
 | Packages fail to install, mentioning a folder in OneDrive | Documents folder synced to OneDrive | Keep projects outside OneDrive; ask your instructor about moving the package library |
 | Errors mentioning paths with strange characters | Windows username contains spaces or non-English characters | Keep projects in a simple folder such as `C:/R-projects` |
-| Mac: packages fail with "incompatible architecture" | Intel R on an Apple silicon Mac | Check `R.version$arch` (@sec-check); reinstall the `arm64` version |
+| Mac: packages fail with "incompatible architecture" | Intel R on an Apple silicon Mac | Check `R.version$arch` (@sec-know-computer); reinstall the `arm64` version |
 | Mac: arm64 installer refuses to install | macOS older than 14 | Update macOS, or use Posit Cloud |
 | RStudio says it cannot find R | R not installed, or installed after RStudio and not detected | Install R, then restart the computer |
 | A package needs "compilation" and fails | A package without a ready-made version | Answer **no** to compiling, or install Rtools / Command Line Tools (@sec-rtools) |
@@ -626,117 +635,12 @@ To see where your packages are stored:
 .libPaths()
 ```
 
-# R Basics: Operators and Names {#sec-basics}
-
-A short introduction to the grammar of R, which Session 2 builds on.
-
-## R as a Calculator {#sec-calculator}
-
-```{r}
-#| label: arithmetic
-
-5 + 3
-5 - 3
-5 * 3
-5 / 3
-5 ^ 3        # exponent
-17 %/% 5     # integer division: 3
-17 %% 5      # remainder (modulo): 2
-```
-
-R follows the usual order of operations. Use parentheses when in doubt:
-
-```{r}
-#| label: precedence
-
-100 + 200 / 10 - 3 * 10
-(100 + 200) / (10 - 3) * 10
-```
-
-## Assignment {#sec-assignment}
-
-`<-` stores a value under a name, creating an **object**. The object appears in the **Environment** pane.
-
-```{r}
-#| label: assignment
-
-revenue <- 125000
-cost    <- 98000
-profit  <- revenue - cost
-profit
-```
-
-`=` also works for assignment, but `<-` is the convention in R, and `=` is used for function arguments, as in `mean(x, na.rm = TRUE)`. The shortcut for `<-` is `Alt` + `-` (Windows) or `Option` + `-` (Mac).
-
-## Comparison and Logical Operators {#sec-logical}
-
-Comparisons return `TRUE` or `FALSE`:
-
-```{r}
-#| label: comparison
-
-profit > 20000
-profit == 27000     # == tests equality; a single = assigns
-profit != 27000     # not equal
-```
-
-| Operator | Meaning |
-|----------|---------|
-| `<`, `<=`, `>`, `>=` | Less than, at most, greater than, at least |
-| `==`, `!=` | Equal, not equal |
-| `!` | Not |
-| `&` | And (element by element) |
-| `|` | Or (element by element) |
-| `%in%` | Is this value in a set? |
-
-```{r}
-#| label: logical
-
-region <- "South"
-
-region == "South" | region == "West"
-region %in% c("South", "West")      # same thing, easier to read
-!(region %in% c("South", "West"))   # not in the set
-```
-
-::: {.callout-note}
-## `&&` and `||`
-You will also see `&&` and `||` in older code. They work on **single** values only and are used in `if` statements (Session 6). Since R 4.3, using them with a vector of more than one value is an error.
-:::
-
-## Naming Objects {#sec-naming}
-
-Names can contain letters, numbers, `_` and `.`, but must start with a letter. They are **case-sensitive**: `Revenue` and `revenue` are different objects.
-
-**Do:**
-
-- Use `snake_case`: lowercase words joined by underscores, e.g. `annual_revenue`
-- Make names short but meaningful: `cust_survey` rather than `data2` or `x`
-- Be consistent
-
-**Avoid:**
-
-- Names already used by R, such as `c`, `T`, `F`, `mean`, `data`
-- Spaces (they require backticks: `` `annual revenue` ``)
-- Starting a name with a number or a `.`
-
-## Comments {#sec-comments}
-
-Anything after `#` on a line is a **comment**, ignored by R. Use comments to explain *why* you did something; your code already says *what*.
-
-```{r}
-#| label: comments
-
-# Exclude the pilot stores, which opened mid-year
-stores <- 44 - 3
-```
-
 # Your Turn {#sec-your-turn}
 
 ::: {.callout-important}
 ## Exercise
-1. Install R and RStudio. Run the checks in @sec-check and confirm `R.version$arch` matches your computer.
-2. Change the four RStudio settings in @sec-settings.
+1. Install R and RStudio. Confirm `R.version$arch` matches your computer (@sec-know-computer).
+2. Change the RStudio settings in @sec-settings.
 3. Create an RStudio Project called `dba-r-workshop` in a folder that is **not** synced to OneDrive or iCloud.
 4. Install the course packages (@sec-course-packages) and confirm every package returns `TRUE`.
 5. Create a `data` folder in your project, and use `write.csv()` to save the data frame below as `data/employees.csv`. Read it back with `read.csv()` and check its structure with `str()`.
@@ -759,17 +663,15 @@ employees <- data.frame(
 ```{r}
 #| label: exercise-solution
 
-library(here)
+dir.create("data", showWarnings = FALSE)
+write.csv(employees, "data/employees.csv", row.names = FALSE)
 
-dir.create(here("data"), showWarnings = FALSE)
-write.csv(employees, here("data", "employees.csv"), row.names = FALSE)
-
-employees_in <- read.csv(here("data", "employees.csv"))
+employees_in <- read.csv("data/employees.csv")
 str(employees_in)
 mean(employees_in$salary)
 ```
 
-For step 6, your Quarto document needs the code above, **including** `library(here)` and `read.csv()`, because rendering starts from a fresh R session (@sec-first-qmd).
+For step 6, your Quarto document needs the code above, **including** the line that creates `employees`, because rendering starts from a fresh R session (@sec-first-qmd). Save the document at the top of your project, next to `data/`, so the path `"data/employees.csv"` works.
 :::
 
 # Summary {#sec-summary}
@@ -777,7 +679,7 @@ For step 6, your Quarto document needs the code above, **including** `library(he
 - **R is the engine, RStudio is the dashboard.** Install R first, choosing the version for your processor; on Apple silicon Macs, `R.version$arch` must say `"aarch64"` (@sec-install).
 - **Turn off saving and restoring `.RData`**, so your scripts are the complete record of your work (@sec-settings).
 - **Install** a package once with `install.packages()`; **load** it every session with `library()` (@sec-packages).
-- **Use one RStudio Project per research project**, build paths with `here()`, and keep `setwd()` out of scripts you keep (@sec-projects).
+- **Use one RStudio Project per research project**, write paths relative to the project folder, and keep `setwd()` out of scripts you keep (@sec-projects).
 - **Quarto documents render in a fresh R session**, so they must contain all the code they need (@sec-quarto).
 - **Read error messages**, use `?function`, and include code, error, and `sessionInfo()` when asking for help (@sec-help).
 

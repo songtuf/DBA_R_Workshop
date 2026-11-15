@@ -1,0 +1,5 @@
+[
+  {"store": "S01", "region": "East",  "sales": 125000, "open_weekends": true},
+  {"store": "S02", "region": "South", "sales": 98000,  "open_weekends": false},
+  {"store": "S03", "region": "West",  "sales": 143500, "open_weekends": true}
+]

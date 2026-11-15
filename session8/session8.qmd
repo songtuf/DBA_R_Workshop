@@ -1,0 +1,575 @@
+---
+title: "Session 8: Descriptive Statistics, Models, and Tables"
+subtitle: "R Workshop for DBA Students"
+author: "Taikgun Song"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    number-sections: true
+    code-copy: true
+    code-tools: true
+    embed-resources: true
+    fig-width: 7
+    fig-height: 4.5
+    grid:
+      body-width: 1100px   # main text column (Quarto default: 800px)
+      margin-width: 150px  # right margin, unused here (default: 250px)
+    tbl-colwidths: false   # let the browser size table columns to their contents
+execute:
+  echo: true
+  warning: true
+---
+
+<!--
+HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
+- Companion slides: session8-slides.qmd
+- BEFORE RENDERING: put finance_example.csv in data/.
+- Packages: tidyverse, plus broom and knitr, which are installed with the tidyverse
+  and with Quarto/rmarkdown. No other packages.
+- Data facts mentioned in the text (checked 2026-11-14 against the GitHub copy):
+  fin_model has 3,090 firms (of 3,808); Pearson correlation of revenue and market cap
+  is about 0.01 on the raw scale and about 0.85 on the log scale; in the capstone,
+  302 Technology/Healthcare firms have R&D spending above revenue (290 of them in Healthcare,
+  median revenue about $250,000); the rd_intensity coefficient is positive in both sectors.
+- The statistical interpretation of the models is left to the statistics course.
+-->
+
+::: {.callout-note}
+## Session Objectives
+
+By the end of this session, you will be able to:
+
+1. Describe data with summary statistics, cross-tabulations, and correlations
+2. Explain why skewed variables are often analyzed on a log scale
+3. Write model formulas: several predictors, factors, interactions, and transformations
+4. Fit linear and logistic regression models with `lm()` and `glm()`, and read their output
+5. Extract results from model objects with base R and `broom`
+6. Build descriptive and regression tables for a paper, and render them to Word
+7. Carry out a complete analysis, from raw file to report, in one Quarto document
+:::
+
+```{r}
+#| label: setup
+#| warning: false   # hide 'package built under R version x.y.z' warnings
+#| message: false
+
+library(tidyverse)
+library(broom)      # model results as data frames (installed with the tidyverse)
+library(knitr)      # kable() tables (installed with Quarto and rmarkdown)
+```
+
+# The Data {#sec-data}
+
+We build a modeling dataset from the raw finance file, using everything from Sessions 4 to 6. Models need positive revenue and market cap (for logs, @sec-logs) and typical net margins (Session 7 showed how a few extreme values dominate a fitted line):
+
+```{r}
+#| label: build-data
+
+finance_raw <- read.csv("../data/finance_example.csv", check.names = FALSE)
+names(finance_raw)[1] <- "ticker"
+
+fin_model <- as_tibble(finance_raw) |>
+  select(ticker,
+         sector            = Sector,
+         revenue           = Revenue,
+         net_margin        = `Net Profit Margin`,
+         market_cap        = `Market Cap`,
+         debt_to_equity    = `Debt to Equity`,
+         price_change_2015 = `2015 PRICE VAR [%]`) |>
+  filter(revenue > 0, market_cap > 0, between(net_margin, -1, 1)) |>
+  mutate(super_sector = case_when(
+           sector %in% c("Basic Materials", "Consumer Cyclical",
+                         "Financial Services", "Real Estate")           ~ "Cyclical",
+           sector %in% c("Consumer Defensive", "Healthcare", "Utilities") ~ "Defensive",
+           sector %in% c("Communication Services", "Energy",
+                         "Industrials", "Technology")                     ~ "Sensitive"),
+         super_sector = factor(super_sector),
+         price_up     = if_else(price_change_2015 > 0, "Up", "Down"))
+
+c(raw = nrow(finance_raw), modeling = nrow(fin_model))
+```
+
+Reporting how many observations you started with and how many you analyze is the first line of any methods section.
+
+# Descriptive Statistics {#sec-descriptive}
+
+## Summaries {#sec-summaries}
+
+`summary()` gives the quick overview; individual functions give exactly the statistic you want:
+
+```{r}
+#| label: summaries
+
+summary(fin_model$net_margin)
+
+mean(fin_model$net_margin)
+sd(fin_model$net_margin)
+quantile(fin_model$net_margin, probs = c(0.10, 0.25, 0.50, 0.75, 0.90))
+```
+
+By group, use `group_by()` and `summarise()` from Session 5:
+
+```{r}
+#| label: group-summaries
+
+fin_model |>
+  group_by(super_sector) |>
+  summarise(n             = n(),
+            mean_margin   = mean(net_margin),
+            sd_margin     = sd(net_margin),
+            median_margin = median(net_margin))
+```
+
+## Cross-Tabulations {#sec-crosstabs}
+
+For two categorical variables, `table()` counts every combination, and `prop.table()` turns counts into proportions. `margin = 1` makes each **row** add up to 1:
+
+```{r}
+#| label: crosstab
+
+counts <- table(fin_model$super_sector, fin_model$price_up)
+counts
+
+prop.table(counts, margin = 1) |> round(3)      # share of each super sector that went up or down
+```
+
+`addmargins(counts)` adds row and column totals.
+
+## Correlations {#sec-correlations}
+
+`cor()` measures how strongly two numeric variables move together, from -1 to 1. Given several columns, it returns a **correlation matrix**:
+
+```{r}
+#| label: correlations
+
+fin_model |>
+  select(revenue, market_cap, net_margin, debt_to_equity) |>
+  cor(use = "complete.obs") |>                     # skip rows with missing values
+  round(2)
+```
+
+`use = "complete.obs"` is needed because `debt_to_equity` has missing values; without it, every correlation involving that column is `NA`.
+
+Look at revenue and market cap: a correlation of almost exactly **zero**. In Session 7's scatter plot, the two were clearly related. What happened? The next section explains.
+
+# Skewed Variables and Logs {#sec-logs}
+
+Revenue and market cap are extremely **skewed**: most firms are small, and a few are enormous. The Pearson correlation `cor()` computes is very sensitive to extreme values, and the $96 trillion firm from Session 5 alone is enough to hide the relationship.
+
+On a **log scale**, the same data looks completely different:
+
+```{r}
+#| label: log-correlation
+
+cor(fin_model$revenue, fin_model$market_cap)              # raw scale
+cor(log(fin_model$revenue), log(fin_model$market_cap))    # log scale
+cor(fin_model$revenue, fin_model$market_cap, method = "spearman")   # based on ranks
+```
+
+The **Spearman** correlation, which uses only the ranks of the values, is not fooled by extreme values either.
+
+```{r}
+#| label: log-histograms
+#| fig-height: 3.5
+
+par(mfrow = c(1, 2))                                 # two plots side by side
+hist(fin_model$market_cap, breaks = 50, main = "Market cap", xlab = "USD")
+hist(log(fin_model$market_cap), breaks = 50, main = "log(Market cap)", xlab = "log(USD)")
+```
+
+This is why financial size variables (revenue, assets, market cap) are almost always analyzed as logs in research. `log()` in R is the natural logarithm; `log10()` is base 10, as on Session 7's plot axes. Both work; the natural log is the convention in most models.
+
+::: {.callout-warning}
+## Logs need positive values
+`log(0)` is `-Inf`, and the log of a negative number is `NaN`. That is why `fin_model` keeps only firms with positive revenue and market cap. With zeros in your data, decide (and report) how to handle them before taking logs.
+:::
+
+# The Formula Interface {#sec-formulas}
+
+Almost every modeling function in R describes the model with a **formula**: the outcome on the left of `~`, the predictors on the right. Read `~` as "is modeled by."
+
+| Formula | Meaning |
+|---------|---------|
+| `y ~ x` | `y` modeled by `x` |
+| `y ~ x1 + x2` | Two predictors |
+| `y ~ x1 + group` | A factor predictor: R creates dummy variables (Session 2) |
+| `y ~ x1 * group` | Both predictors **and** their interaction |
+| `y ~ x1 + x1:group` | Only the interaction term `x1:group`, plus `x1` |
+| `log(y) ~ log(x)` | Transformations inside the formula |
+| `y ~ x + I(x^2)` | Arithmetic inside `I()`, here a squared term |
+| `y ~ 0 + group` | No intercept (one-hot coding, Session 2) |
+| `y ~ .` | Every other column in the data |
+
+The same formula syntax works across R, so learning it once pays off everywhere:
+
+```{r}
+#| label: formula-everywhere
+
+aggregate(net_margin ~ super_sector, data = fin_model, FUN = median)   # summaries
+t.test(log(revenue) ~ price_up, data = fin_model)                      # a t-test
+```
+
+You saw it in `boxplot(net_margin ~ sector, ...)` in Session 7, and you will meet it in nearly every function of your statistics course.
+
+# Linear Regression with `lm()` {#sec-lm}
+
+## Fitting Models {#sec-fit}
+
+We fit three models of (log) market cap, each adding predictors. The statistics course will cover what the numbers mean; here we focus on the mechanics.
+
+```{r}
+#| label: fit-lm
+
+m1 <- lm(log(market_cap) ~ log(revenue), data = fin_model)
+m2 <- lm(log(market_cap) ~ log(revenue) + net_margin, data = fin_model)
+m3 <- lm(log(market_cap) ~ log(revenue) + net_margin + super_sector, data = fin_model)
+
+summary(m3)
+```
+
+How to read the parts of `summary()`:
+
+| Part | What it shows |
+|------|---------------|
+| `Call` | The formula and data you used: check it is the model you meant |
+| `Residuals` | The spread of the differences between observed and fitted values |
+| `Coefficients` | One row per term: estimate, standard error, t value, p-value |
+| `super_sectorDefensive`, `super_sectorSensitive` | Dummy variables, compared with the **reference level**, `Cyclical` (Session 2) |
+| `Residual standard error`, `R-squared`, `F-statistic` | How well the model fits overall |
+
+To compare with a different reference level, change it in the data with `fct_relevel()` (Session 2) and refit.
+
+## Interactions {#sec-interactions}
+
+`*` adds an interaction: here, whether the relationship between revenue and market cap differs by super sector:
+
+```{r}
+#| label: interaction
+
+m4 <- lm(log(market_cap) ~ log(revenue) * super_sector, data = fin_model)
+coef(m4)
+```
+
+The terms with `:`, such as `log(revenue):super_sectorDefensive`, are the interaction terms.
+
+# Logistic Regression with `glm()` {#sec-glm}
+
+When the outcome is **binary** (yes/no, up/down, adopted/not adopted), linear regression is not appropriate; **logistic regression** is the standard model. In R it is `glm()`, a "generalized linear model", with `family = binomial`. The formula works exactly as in `lm()`.
+
+The outcome must be coded 0/1 (or as a factor whose second level is the "success"). Here, did the stock price go up in 2015?
+
+```{r}
+#| label: fit-glm
+
+fin_model <- fin_model |>
+  mutate(up_2015 = as.integer(price_change_2015 > 0))     # 1 = went up, 0 = did not
+
+m_logit <- glm(up_2015 ~ log(revenue) + net_margin + super_sector,
+               family = binomial,
+               data   = fin_model)
+
+summary(m_logit)
+```
+
+The output looks like `lm()`'s, with a few differences: coefficients are on the **log-odds** scale, there is no R-squared, and fit is summarized by deviance and AIC. Your statistics course covers what these mean. Two lines you will use there:
+
+```{r}
+#| label: glm-extras
+
+exp(coef(m_logit))                                          # odds ratios
+predict(m_logit, type = "response") |> head()               # predicted probabilities
+```
+
+# Working with Model Objects {#sec-model-objects}
+
+## Base R Extractors {#sec-extractors}
+
+A fitted model is a list (Session 2), and functions pull out each part:
+
+```{r}
+#| label: extractors
+
+coef(m2)                         # estimates
+confint(m2)                      # 95% confidence intervals
+head(fitted(m2))                 # fitted values, one per firm
+head(residuals(m2))              # residuals, one per firm
+nobs(m2)                         # observations used
+```
+
+`predict()` applies a model to **new** data. For example, the predicted market cap of three hypothetical firms:
+
+```{r}
+#| label: predict
+
+new_firms <- tibble(revenue    = c(1e8, 1e9, 1e10),        # $100M, $1B, $10B
+                    net_margin = 0.10)
+
+predict(m2, newdata = new_firms)                    # predicted log(market cap)
+exp(predict(m2, newdata = new_firms))               # back to dollars
+```
+
+## `broom`: Model Results as Data Frames {#sec-broom}
+
+The base R extractors return vectors and matrices in different shapes. `broom` turns any model into a **tidy data frame**, which you can filter, sort, plot, and turn into tables with everything you have learned:
+
+| Function | Returns | One row per |
+|----------|---------|-------------|
+| `tidy()` | Estimates, standard errors, statistics, p-values | Term |
+| `glance()` | Fit statistics: R-squared, AIC, number of observations | Model |
+| `augment()` | The data plus fitted values and residuals | Observation |
+
+```{r}
+#| label: broom
+
+tidy(m3)
+tidy(m3, conf.int = TRUE)                       # add confidence intervals
+glance(m3)
+augment(m3) |> select(1:3, .fitted, .resid) |> head(3)
+tidy(m_logit, exponentiate = TRUE)              # odds ratios for a logistic model
+```
+
+Because the results are data frames, comparing models is ordinary data wrangling:
+
+```{r}
+#| label: compare-models
+
+list(m1 = m1, m2 = m2, m3 = m3) |>
+  map(glance) |>                                  # one glance() per model (Session 3)
+  bind_rows(.id = "model") |>                     # stack them (Session 6)
+  select(model, r.squared, adj.r.squared, AIC, nobs)
+```
+
+# Tables for Papers {#sec-tables}
+
+`knitr::kable()` turns any data frame into a formatted table, in HTML, PDF, or Word, depending on how you render the document.
+
+## A Descriptive Table {#sec-desc-table}
+
+```{r}
+#| label: desc-table
+
+desc_table <- fin_model |>
+  group_by(super_sector) |>
+  summarise(Firms             = n(),
+            `Revenue ($B)`    = median(revenue) / 1e9,
+            `Net margin`      = sprintf("%.3f (%.3f)", mean(net_margin), sd(net_margin)),
+            `Share up 2015`   = mean(up_2015)) |>
+  rename(`Super sector` = super_sector)
+
+kable(desc_table,
+      digits  = 2,
+      caption = "Firm characteristics by super sector. Revenue is the median; net margin is the mean (SD).")
+```
+
+`sprintf("%.3f (%.3f)", m, s)` formats two numbers as text with three decimals, the common "mean (SD)" style.
+
+## A Regression Table {#sec-reg-table}
+
+A regression table in a paper shows several models side by side: one column per model, one row per term, with standard errors in parentheses. We build it in three steps, with tools from Sessions 3, 5, and 6.
+
+**Step 1: coefficients**, from `tidy()`, formatted with stars:
+
+```{r}
+#| label: reg-table-coefs
+
+models <- list("(1)" = m1, "(2)" = m2, "(3)" = m3)
+
+coef_rows <- models |>
+  map(tidy) |>
+  bind_rows(.id = "model") |>
+  mutate(stars = case_when(p.value < 0.01 ~ "***",
+                           p.value < 0.05 ~ "**",
+                           p.value < 0.10 ~ "*",
+                           .default       = ""),
+         cell  = paste0(sprintf("%.3f", estimate), stars,
+                        " (", sprintf("%.3f", std.error), ")")) |>
+  select(model, term, cell) |>
+  pivot_wider(names_from = model, values_from = cell, values_fill = "")
+
+coef_rows
+```
+
+**Step 2: fit statistics**, from `glance()`, reshaped to the same layout:
+
+```{r}
+#| label: reg-table-fit
+
+fit_rows <- models |>
+  map(glance) |>
+  bind_rows(.id = "model") |>
+  transmute(model,
+            Observations = as.character(nobs),
+            `R-squared`  = sprintf("%.3f", r.squared)) |>
+  pivot_longer(-model, names_to = "term", values_to = "cell") |>
+  pivot_wider(names_from = model, values_from = cell)
+```
+
+**Step 3: stack and display.** `kable()` with readable term names:
+
+```{r}
+#| label: reg-table
+
+reg_table <- bind_rows(coef_rows, fit_rows) |>
+  mutate(term = case_when(term == "(Intercept)"           ~ "Intercept",
+                          term == "log(revenue)"          ~ "log(Revenue)",
+                          term == "net_margin"            ~ "Net margin",
+                          term == "super_sectorDefensive" ~ "Defensive (vs. Cyclical)",
+                          term == "super_sectorSensitive" ~ "Sensitive (vs. Cyclical)",
+                          .default = term))
+
+kable(reg_table,
+      col.names = c("", "(1)", "(2)", "(3)"),
+      align     = "lccc",
+      caption   = "Dependent variable: log(market cap). Standard errors in parentheses. * p < 0.10, ** p < 0.05, *** p < 0.01.")
+```
+
+The code is longer than one function call, but every step is something you already know, and you control every detail. Journals differ in what they want (stars or none, standard errors or t-statistics, the same line or the next): change a line or two.
+
+::: {.callout-tip}
+## Many packages, one job
+Packages such as `modelsummary` and `gtsummary` produce regression and descriptive tables in one function call, with many formatting options. They are worth exploring once you know what you want your tables to look like.
+:::
+
+## Rendering to Word {#sec-word}
+
+Most journals and coauthors want Word files. Quarto renders the same document to Word by changing the format in the header:
+
+```yaml
+format: docx
+```
+
+Or keep both formats, and choose in RStudio's **Render** menu:
+
+```yaml
+format:
+  html: default
+  docx: default
+```
+
+`kable()` tables become native Word tables, which you or your coauthors can edit. Figures are included automatically, and code chunks can be hidden in the output with `echo: false` under `execute:` in the header.
+
+# Capstone: From Raw File to Report {#sec-capstone}
+
+::: {.callout-important}
+## Capstone exercise
+**Research question:** In technology and healthcare, do firms that spend more of their revenue on R&D have higher market values, for a given revenue?
+
+Create a **new Quarto document** that answers this question from the raw file, using what you learned in every session:
+
+1. **Import (Session 4):** read `data/finance_example.csv` and name the first column `ticker`.
+2. **Select and filter (Session 5):** keep `ticker`, `Sector`, `Revenue`, `R&D Expenses`, and `Market Cap`, with `snake_case` names. Keep the Technology and Healthcare sectors.
+3. **Check the data (Sessions 5 and 6):** count missing values in each column. How many firms have R&D spending **greater than** revenue? Look at a few of them: what kind of firms are they?
+4. **Create variables (Session 5):** `rd_intensity = rd_expenses / revenue`. Keep firms with positive revenue and market cap and with `rd_intensity` between 0 and 1, and report how many firms you excluded and why.
+5. **Plot (Session 7):** a scatter plot of market cap (log scale) against `rd_intensity`, faceted by sector, with a title that states what you see.
+6. **Describe (this session):** a table by sector with the number of firms, median revenue, and median R&D intensity.
+7. **Model (this session):** fit `log(market_cap) ~ log(revenue)`, then add `rd_intensity`, then add `sector`. Present the three models in a regression table.
+8. **Report:** write two or three sentences answering the research question, and render the document to Word.
+:::
+
+::: {.callout-tip collapse="true"}
+## Capstone solution (click to expand)
+```{r}
+#| label: capstone-solution
+
+# 1. Import
+raw <- read.csv("../data/finance_example.csv", check.names = FALSE)
+names(raw)[1] <- "ticker"
+
+# 2. Select and filter
+rd <- as_tibble(raw) |>
+  select(ticker,
+         sector      = Sector,
+         revenue     = Revenue,
+         rd_expenses = `R&D Expenses`,
+         market_cap  = `Market Cap`) |>
+  filter(sector %in% c("Technology", "Healthcare"))
+
+# 3. Check the data
+rd |> summarise(across(everything(), \(x) sum(is.na(x))))
+
+rd |>
+  filter(rd_expenses > revenue) |>
+  arrange(desc(rd_expenses / revenue)) |>
+  head()          # mostly healthcare firms with small revenue: early-stage biotech
+
+# 4. Create variables and filter, reporting exclusions
+rd_clean <- rd |>
+  mutate(rd_intensity = rd_expenses / revenue) |>
+  filter(revenue > 0, market_cap > 0, between(rd_intensity, 0, 1))
+
+c(technology_and_healthcare = nrow(rd), analyzed = nrow(rd_clean),
+  excluded = nrow(rd) - nrow(rd_clean))
+
+# 5. Plot
+ggplot(rd_clean, aes(x = rd_intensity, y = market_cap)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", formula = y ~ x) +
+  scale_y_log10(labels = scales::label_dollar(scale_cut = scales::cut_short_scale())) +
+  scale_x_continuous(labels = scales::label_percent()) +
+  facet_wrap(~ sector) +
+  labs(title = "Market value and R&D intensity in technology and healthcare",
+       x = "R&D spending as a share of revenue", y = "Market cap (log scale)") +
+  theme_minimal()
+
+# 6. Describe
+rd_clean |>
+  group_by(sector) |>
+  summarise(Firms                 = n(),
+            `Median revenue ($M)` = median(revenue) / 1e6,
+            `Median R&D intensity` = median(rd_intensity)) |>
+  kable(digits = 2)
+
+# 7. Model
+rd_models <- list(
+  "(1)" = lm(log(market_cap) ~ log(revenue), data = rd_clean),
+  "(2)" = lm(log(market_cap) ~ log(revenue) + rd_intensity, data = rd_clean),
+  "(3)" = lm(log(market_cap) ~ log(revenue) + rd_intensity + sector, data = rd_clean)
+)
+
+rd_coefs <- rd_models |>
+  map(tidy) |>
+  bind_rows(.id = "model") |>
+  mutate(cell = paste0(sprintf("%.3f", estimate),
+                       case_when(p.value < 0.01 ~ "***", p.value < 0.05 ~ "**",
+                                 p.value < 0.10 ~ "*", .default = ""),
+                       " (", sprintf("%.3f", std.error), ")")) |>
+  select(model, term, cell) |>
+  pivot_wider(names_from = model, values_from = cell, values_fill = "")
+
+rd_fit <- rd_models |>
+  map(glance) |>
+  bind_rows(.id = "model") |>
+  transmute(model, Observations = as.character(nobs),
+            `R-squared` = sprintf("%.3f", r.squared)) |>
+  pivot_longer(-model, names_to = "term", values_to = "cell") |>
+  pivot_wider(names_from = model, values_from = cell)
+
+bind_rows(rd_coefs, rd_fit) |>
+  kable(col.names = c("", "(1)", "(2)", "(3)"), align = "lccc",
+        caption = "Dependent variable: log(market cap). Standard errors in parentheses.")
+```
+
+**8.** For a given revenue, firms with higher R&D intensity tend to have higher market values in both sectors (the `rd_intensity` coefficient is positive in models 2 and 3). The statistics course will help you judge how strong this evidence is, and what else could explain it.
+
+The regression-table code appears twice in this session. That is the signal from Session 3: if you will make tables like this often, turn it into a function, `make_reg_table(models)`, and reuse it.
+:::
+
+# Summary {#sec-summary}
+
+- **Describe before you model:** `summary()`, group summaries, `table()` and `prop.table()`, and `cor()` with `use = "complete.obs"` (@sec-descriptive).
+- **Skewed size variables are analyzed as logs.** Extreme values can hide a strong relationship from the Pearson correlation; logs or Spearman correlation reveal it (@sec-logs).
+- **One formula syntax everywhere:** `y ~ x1 + x2`, factors become dummies, `*` adds interactions, `log()` and `I()` transform (@sec-formulas).
+- **`lm()`** for continuous outcomes, **`glm(family = binomial)`** for binary ones (@sec-lm, @sec-glm).
+- **Extract results** with `coef()`, `confint()`, `predict()`, or as data frames with `broom::tidy()`, `glance()`, and `augment()` (@sec-model-objects).
+- **Tables for papers:** wrangle `broom` output with `dplyr` and `pivot_wider()`, display with `kable()`, and render to Word with `format: docx` (@sec-tables).
+
+**Congratulations on finishing the workshop.** You can now take a raw data file to a cleaned dataset, figures, and tables in one reproducible document, which is the first part of every empirical paper you will write.
+
+## Further Reading
+
+- [R for Data Science (2e)](https://r4ds.hadley.nz/): the best next step, cover to cover
+- [broom documentation](https://broom.tidymodels.org/)
+- [Quarto: Word documents](https://quarto.org/docs/output-formats/ms-word.html)

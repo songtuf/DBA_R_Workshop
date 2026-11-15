@@ -47,14 +47,21 @@ By the end of this session, you will be able to:
 
 ```{r}
 #| label: setup
+#| warning: false   # hide 'package built under R version x.y.z' warnings
 #| message: false
 
 library(tidyverse)   # includes dplyr, ggplot2, forcats, lubridate
 library(carData)     # installed together with the car package
 
-# Helper used in the text to print dollar amounts
-dollars <- function(x) scales::dollar(round(x))
+# Helper used in the text to print dollar amounts.
+# The backslash stops "$" from being read as the start of a math formula.
+dollars <- function(x) paste0("\\$", format(round(x), big.mark = ","))
 ```
+
+::: {.callout-note}
+## A note on operators
+This session uses `<-` to store values under a name, as in `x <- 5`, and a few comparison operators such as `==` (equal to) and `>` (greater than). Session 3 covers operators in detail.
+:::
 
 # Why Data Types Matter {#sec-why}
 
@@ -583,7 +590,7 @@ employees$senior <- employees$tenure_years >= 5       # add a new column
 str(employees)
 ```
 
-The `dplyr` package does the same things with functions that read like sentences. You will learn it properly in Sessions 4 and 5. Here is a preview:
+The `dplyr` package does the same things with functions that read like sentences. You will learn it properly in Sessions 5 and 6. Here is a preview:
 
 ```{r}
 #| label: df-dplyr-preview
@@ -936,7 +943,7 @@ tapply(Salaries$salary, Salaries$discipline, mean)
 - Reference coding and one-hot coding give different coefficients but identical predictions (@sec-onehot). Ordered factors use polynomial contrasts (@sec-ordered).
 - Vectors, matrices, and arrays hold one type; data frames hold one type per column; lists hold anything (@sec-structures).
 
-**Next session:** importing real-world data from CSV, Excel, SPSS, and Stata files.
+**Next session:** operators, functions, and loops.
 
 ## Further Reading
 

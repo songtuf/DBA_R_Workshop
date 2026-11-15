@@ -1,0 +1,768 @@
+---
+title: "Session 3: Operators, Functions, and Loops"
+subtitle: "R Workshop for DBA Students"
+author: "Taikgun Song"
+date: today
+format:
+  beamer:
+    theme: Madrid
+    colortheme: default
+    aspectratio: 169
+    navigation: empty
+    toc: true
+    toc-title: "Outline"
+    number-sections: true
+    slide-level: 2
+    pdf-engine: xelatex
+    include-in-header:
+      text: |
+        \usepackage{etoolbox}
+        \AtBeginEnvironment{Shaded}{\scriptsize}
+        % Tables one size smaller than body text
+        \AtBeginEnvironment{longtable}{\footnotesize}
+        \makeatletter
+        \def\verbatim@font{\scriptsize\ttfamily}
+        \makeatother
+        \AtBeginSection[]{\begin{frame}{Outline}\tableofcontents[currentsection]\end{frame}}
+filters:
+  - small-output.lua   # smaller, gray R output (file must sit next to this one)
+execute:
+  echo: true
+  warning: true
+---
+
+<!--
+HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
+- Companion to session3.qmd (the HTML handout). Same content, condensed into slides.
+- # = section, ## = slide, ### = box ({.alert} red, {.example} green)
+- Chunks with `#| error: true` deliberately produce an error; rendering continues.
+- Input checks (stopifnot/stop/warning) and tryCatch() moved to the "Error handling" elective.
+- Needs small-output.lua in the same folder, and LaTeX (`quarto install tinytex`).
+-->
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+options(width = 70, useFancyQuotes = FALSE)
+```
+
+## Session Objectives
+
+By the end of this session, you will be able to:
+
+1. Use R's operators, and know that they work on whole vectors
+2. Call functions using named and positional arguments
+3. Explain what a function is, and write your own with default arguments
+4. Make decisions with `if`/`else`, `if_else()`, and `case_when()`
+5. Repeat tasks with `for` loops and `purrr::map()`, and know when you do not need a loop
+6. Chain functions together with the pipe `|>`, including its placeholder `_`
+
+## Running Example: Scoring a Survey Scale
+
+:::: {.columns}
+::: {.column width="58%"}
+| Item | Wording | |
+|------|---------|---|
+| `eng1` | I am enthusiastic about my job | |
+| `eng2` | I feel proud of the work I do | |
+| `eng3` | Time drags when I am at work | **R** |
+| `eng4` | I would recommend this company | |
+| `eng5` | I often think about leaving | **R** |
+:::
+::: {.column width="42%"}
+- 5-point scale: 1 = Strongly disagree, 5 = Strongly agree
+- **R** = reverse-worded: agreeing means *lower* engagement
+- Goal: reverse-code, then average into one **scale score**
+:::
+::::
+
+## The Survey Data
+
+```{r}
+#| label: survey-data
+#| warning: false   # hide 'package built under R version x.y.z' warnings
+#| message: false
+
+library(tidyverse)   # dplyr (if_else, case_when) and purrr (map)
+
+survey <- data.frame(
+  id           = 1:8,
+  department   = c("Sales", "HR", "IT", "Sales", "IT", "HR", "Sales", "IT"),
+  tenure_years = c(2.5, 8, 1, 12, 4.5, 6, 0.5, 9),
+  eng1 = c(4, 5, 2, 4, 3, 5, 1, 4),
+  eng2 = c(5, 4, 2, 5, 3, 4, 2, NA),
+  eng3 = c(2, 1, 4, 2, 3, 1, 5, 2),
+  eng4 = c(4, 5, 1, 4, 4, 5, 2, 3),
+  eng5 = c(1, 2, 5, 2, 3, 1, 4, 2)
+)
+```
+
+# Operators {#sec-operators}
+
+## Arithmetic and Assignment
+
+:::: {.columns}
+::: {.column width="50%"}
+```{r}
+#| label: arithmetic
+
+5 ^ 3        # exponent
+17 %/% 5     # integer division
+17 %% 5      # remainder (modulo)
+(100 + 200) / (10 - 3) * 10
+```
+:::
+::: {.column width="50%"}
+```{r}
+#| label: assignment
+
+revenue <- 125000
+cost    <- 98000
+profit  <- revenue - cost
+profit
+```
+:::
+::::
+
+- `+ - * /` as usual; standard order of operations, so use parentheses when in doubt
+- `<-` stores a value under a name; assigning to an existing name **overwrites** it
+- `=` is used for function arguments: `mean(x, na.rm = TRUE)`
+
+## Operators Work on Whole Vectors {#sec-vectorized}
+
+```{r}
+#| label: vectorized
+
+quarterly_revenue <- c(120, 135, 128, 150)
+quarterly_cost    <- c(90, 101, 99, 110)
+
+quarterly_revenue - quarterly_cost       # element by element
+quarterly_revenue * 1.05                 # one number applied to every element
+
+6 - survey$eng3                          # reverse-coding a 5-point item!
+```
+
+- One of the most useful ideas in R, and why you need fewer loops than you might expect
+
+## Comparison and Logical Operators
+
+:::: {.columns}
+::: {.column width="38%"}
+| Operator | Meaning |
+|----------|---------|
+| `<` `<=` `>` `>=` | Comparisons |
+| `==` `!=` | Equal, not equal |
+| `!` | Not |
+| `&` / `|` | And / Or |
+| `%in%` | In a set? |
+:::
+::: {.column width="62%"}
+```{r}
+#| label: logical
+
+survey$eng1 >= 4
+survey$eng1 >= 4 & survey$eng2 >= 4
+survey$department %in% c("Sales", "IT")
+
+sum(survey$eng1 >= 4)    # count: TRUE = 1
+mean(survey$eng1 >= 4)   # proportion
+```
+:::
+::::
+
+## `&&` and `||`
+
+- Work on a **single** `TRUE`/`FALSE` only; used inside `if ()` (@sec-if)
+
+```{r}
+#| label: double-and
+
+response_rate <- 0.42
+n_responses   <- 168
+response_rate > 0.3 && n_responses >= 100
+```
+
+- Since R 4.3, a vector of more than one value is an **error**:
+
+```{r}
+#| label: double-and-error
+#| error: true
+
+survey$eng1 >= 4 && survey$eng2 >= 4
+```
+
+### Rule of thumb {.example}
+`&` and `|` on vectors and data; `&&` and `||` inside `if ()`.
+
+## Naming Objects and Comments
+
+Names: letters, numbers, `_` and `.`; must start with a letter; **case-sensitive**
+
+:::: {.columns}
+::: {.column width="50%"}
+**Do**
+
+- `snake_case`: `annual_revenue`
+- Short but meaningful: `eng_survey`, not `data2`
+- Verbs for functions (`reverse_code`), nouns for data (`survey`)
+:::
+::: {.column width="50%"}
+**Avoid**
+
+- Names R uses: `c`, `T`, `F`, `mean`, `data`
+- Spaces (need backticks)
+- Starting with a number or `.`
+:::
+::::
+
+```{r}
+#| label: comments
+
+# Comments explain WHY: pilot stores opened mid-year, so they are excluded
+stores <- 44 - 3
+```
+
+# Using Functions {#sec-using-functions}
+
+## Arguments: Named, Positional, and Defaults
+
+```{r}
+#| label: args-round
+
+args(round)                          # shows the arguments and their defaults
+
+round(3.14159)                       # digits uses its default, 0
+round(3.14159, 2)                    # by position: x first, then digits
+round(digits = 2, x = 3.14159)       # by name, any order
+```
+
+### A good habit {.example}
+Obvious first arguments by position, everything else by name: `mean(survey$eng2, na.rm = TRUE)`, not `mean(survey$eng2, 0, TRUE)`.
+
+## Reading a Help Page to Call a Function
+
+`?mean`, **Usage** section:
+
+```
+mean(x, trim = 0, na.rm = FALSE, ...)
+```
+
+- `x` has no default: you must supply it
+- `trim = 0`, `na.rm = FALSE`: defaults used when you leave them out
+- `...`: other arguments, passed along
+
+```{r}
+#| label: help-page-example
+
+mean(survey$eng2)                    # why NA? na.rm defaults to FALSE
+mean(survey$eng2, na.rm = TRUE)
+```
+
+# Writing Functions {#sec-writing-functions}
+
+## What Is a Function? The Espresso Machine
+
+Press the **two-cup button**: the machine grinds the beans, heats the water, extracts at 20 bar, and pours. **Same steps, same way, same quality, every time.**
+
+| Espresso machine | Function in R |
+|---------------------------------------|---------------------------------------------|
+| The two-cup button | The function's **name** |
+| Your choices: number of cups, strength | **Arguments** (inputs) |
+| The usual strength if you do not choose | **Default** arguments |
+| Grind, heat, extract, pour | The **body** (the steps) |
+| Two shots of espresso | The **return value** (output) |
+| No need to know how the pump works | You can use `mean()` without reading its code |
+
+## The Syntax
+
+```r
+function_name <- function(arg1, arg2) {
+  # the body: steps that use arg1 and arg2
+  output <- ...
+  return(output)
+}
+```
+
+- `function_name <-` stores the function under a name, like any other object
+- `function(arg1, arg2)` lists the inputs
+- The **body**, between `{ }`, holds the steps
+- `return(output)` sends the result back
+
+## Why Write Your Own?
+
+```{r}
+#| label: copy-paste
+#| eval: false
+
+survey$eng3 <- 6 - survey$eng3
+survey$eng5 <- 6 - survey$eng3     # copied the line above... and forgot to change eng3
+```
+
+- The bug is easy to miss: `eng5` is overwritten with the reversed `eng3`
+- If the scale changes (say, to 7 points), every copy must be found and fixed
+- A function is building the button once: the steps live in one place
+
+### Rule of thumb {.example}
+Once you have copied the same code **three times**, write a function.
+
+## A First Function
+
+:::: {.columns}
+::: {.column width="58%"}
+```{r}
+#| label: anatomy
+
+profit_margin <- function(revenue, cost) {
+  margin <- (revenue - cost) / revenue
+  return(margin)
+}
+
+profit_margin(125000, 98000)
+profit_margin(quarterly_revenue, quarterly_cost)
+```
+:::
+::: {.column width="42%"}
+| Part | Example |
+|------|---------|
+| Name | `profit_margin` |
+| Arguments | `revenue`, `cost` |
+| Body `{ }` | The calculation |
+| Return | `return(margin)` |
+
+- `margin` exists only while the function runs
+- Without `return()`, R returns the **last line**: common in others' code
+:::
+::::
+
+## Default Arguments
+
+Like the machine's usual strength: the value used when you do not choose one
+
+```{r}
+#| label: reverse-code
+
+reverse_code <- function(x, scale_min = 1, scale_max = 5) {
+  reversed <- (scale_max + scale_min) - x
+  return(reversed)
+}
+
+reverse_code(survey$eng3)                  # defaults: a 1-to-5 scale
+reverse_code(c(1, 4, 7), scale_max = 7)    # a 7-point scale
+```
+
+- `(scale_max + scale_min) - x` is `6 - x` on a 1--5 scale, `8 - x` on a 1--7 scale
+
+## Recode Missing-Value Codes First
+
+"Prefer not to answer" is often coded `99`. A function does exactly what it was built to do:
+
+```{r}
+#| label: missing-code-warning
+
+reverse_code(c(1, 3, 99))
+```
+
+### Watch out {.alert}
+The `-93` would silently pull down any average it goes into. Replace missing-value codes with `NA` **before** reverse-coding or averaging.
+
+# Making Decisions {#sec-decisions}
+
+## `if` and `else`: One Value {#sec-if}
+
+```{r}
+#| label: else-if
+
+response_rate <- 0.42
+
+if (response_rate >= 0.5) {
+  print("Excellent response rate")
+} else if (response_rate >= 0.3) {
+  print("Acceptable response rate")
+} else {
+  print("Low response rate: send a reminder")
+}
+```
+
+- For decisions about **one thing**: whether to run a step, which file to read, whether to send a reminder
+
+## `if` Needs a Single Value
+
+```{r}
+#| label: if-vector-error
+#| error: true
+
+if (survey$eng1 >= 4) print("Agrees")
+```
+
+- For a decision about **every element** of a vector, use `if_else()`
+
+## `ifelse()` and `if_else()`: Every Element
+
+```{r}
+#| label: if-else-vector
+#| error: true
+
+ifelse(survey$eng1 >= 4, "Agree", "Not agree")     # base R
+if_else(survey$eng1 >= 4, "Agree", "Not agree")    # dplyr
+
+ifelse(survey$eng2 >= 4, "Agree", 0)        # silently mixes text and numbers
+if_else(survey$eng2 >= 4, "Agree", 0)       # stops with an error
+```
+
+- `if_else()` is stricter, and lets you handle missing values: `missing = "No answer"`
+
+## `case_when()`: More Than Two Outcomes
+
+```{r}
+#| label: case-when
+
+case_when(
+  survey$tenure_years < 2  ~ "New",
+  survey$tenure_years < 7  ~ "Established",
+  survey$tenure_years >= 7 ~ "Veteran"
+)
+
+case_when(survey$department == "Sales" ~ "Revenue-generating",
+          .default = "Support")
+```
+
+### Order matters, and so do missing values {.alert}
+The first `TRUE` condition wins, so put specific conditions first. `NA` fails every condition and falls to `.default`: add `is.na(x) ~ NA` first to be explicit.
+
+## `switch()`: Choosing by Name
+
+Picks one option based on a **single** text value; handy for function arguments
+
+```{r}
+#| label: switch
+
+summarize_item <- function(x, stat = "mean") {
+  result <- switch(stat,
+                   mean   = mean(x, na.rm = TRUE),
+                   median = median(x, na.rm = TRUE),
+                   agree  = mean(x >= 4, na.rm = TRUE),   # proportion who agree
+                   NA)                                    # anything else
+  return(result)
+}
+
+summarize_item(survey$eng1)
+summarize_item(survey$eng1, stat = "agree")
+```
+
+# Loops {#sec-loops}
+
+## `for` Loops
+
+The **loop variable** (`item`) takes the next value each time around
+
+```{r}
+#| label: for-reverse
+
+survey_scored <- survey                    # keep the original unchanged
+reverse_items <- c("eng3", "eng5")
+
+for (item in reverse_items) {
+  survey_scored[[item]] <- reverse_code(survey_scored[[item]])
+}
+
+survey_scored[, c("id", "eng3", "eng5")] |> head(3)
+```
+
+- `survey_scored[[item]]`: a column named by a variable (`$item` would look for a column called "item")
+- Function = the logic; loop = the repetition; `reverse_items` = the decision
+
+## Storing Results from a Loop
+
+```{r}
+#| label: for-store
+
+items <- c("eng1", "eng2", "eng3", "eng4", "eng5")
+
+item_means <- numeric(length(items))       # empty container first
+names(item_means) <- items
+
+for (i in seq_along(items)) {              # positions 1, 2, ..., 5
+  item_means[i] <- mean(survey_scored[[items[i]]], na.rm = TRUE)
+}
+round(item_means, 2)
+```
+
+### `seq_along(x)`, not `1:length(x)` {.example}
+If `x` is empty, `1:length(x)` gives `1 0` and the loop runs on elements that do not exist.
+
+## `while` Loops
+
+Repeats **as long as a condition is `TRUE`**: how many years to double at 7%?
+
+```{r}
+#| label: while
+
+balance <- 1000
+years   <- 0
+
+while (balance < 2000) {
+  balance <- balance * 1.07
+  years   <- years + 1
+}
+years
+```
+
+- The condition must eventually become `FALSE`; otherwise press `Esc`
+
+## When You Do Not Need a Loop
+
+```{r}
+#| label: no-loop
+
+reversed <- numeric(nrow(survey))          # a loop over respondents: unnecessary
+for (i in seq_len(nrow(survey))) reversed[i] <- 6 - survey$eng3[i]
+
+identical(reversed, 6 - survey$eng3)       # the vectorized version
+
+survey_scored$engagement <- rowMeans(survey_scored[, items], na.rm = TRUE)
+round(survey_scored$engagement, 2)         # the scale score
+```
+
+### Rule of thumb {.example}
+Loop over **columns, files, or models**. Do not loop over **rows**: there is almost always a vectorized way.
+
+# Applying a Function to Many Things {#sec-map}
+
+## Base R: `lapply()` and `sapply()`
+
+A data frame is a list of columns, so the function runs once per column
+
+```{r}
+#| label: apply-family
+
+lapply(survey_scored[items[1:2]], mean, na.rm = TRUE)   # always a list
+sapply(survey_scored[items], mean, na.rm = TRUE)        # simplifies when it can
+```
+
+- Common in older code and online answers
+- `sapply()`'s output type depends on the results, which can surprise you
+
+## `purrr::map()`: The Recommended Way
+
+:::: {.columns}
+::: {.column width="35%"}
+| Function | Returns |
+|----------|---------|
+| `map()` | A list |
+| `map_dbl()` | Numeric |
+| `map_chr()` | Character |
+| `map_lgl()` | Logical |
+| `map_int()` | Integer |
+:::
+::: {.column width="65%"}
+- Consistent: the name says the output type, or it stops with an error
+- `\(x)` is short for `function(x)`: a small **anonymous function**
+:::
+::::
+
+```{r}
+#| label: map
+
+map_dbl(survey_scored[items], \(x) mean(x, na.rm = TRUE))
+map_int(survey_scored[items], \(x) sum(is.na(x)))       # missing per item
+```
+
+## The Reverse-Coding Loop with `map()`
+
+```{r}
+#| label: map-reverse
+
+survey_scored2 <- survey
+survey_scored2[reverse_items] <- map(survey[reverse_items], reverse_code)
+
+identical(survey_scored2[reverse_items], survey_scored[reverse_items])
+```
+
+### `for` loop or `map()`? {.example}
+Both are fine. A `for` loop is easier to debug when starting out; `map()` is shorter once comfortable. Sessions 5 and 6 add `dplyr::across()` for columns of a data frame.
+
+# The Pipe `|>` {#sec-pipe}
+
+## Functions as Mappings
+
+- A function $f: A \to B$ **maps** each input to an output
+- $f(x) = 2x$ doubles; $g(x) = x + 1$ adds one
+
+```{r}
+#| label: f-and-g
+
+f <- function(x) {
+  return(2 * x)
+}
+g <- function(x) {
+  return(x + 1)
+}
+
+f(3)
+g(3)
+```
+
+## Chaining Functions
+
+"Double 3, then add 1": $g(f(3)) = (g \circ f)(3)$
+
+```{r}
+#| label: composition
+
+g(f(3))              # nested: read from the inside out
+3 |> f() |> g()      # piped: read left to right, in the order steps happen
+```
+
+| Nested | Piped |
+|--------|-------|
+| `f(x)` | `x |> f()` |
+| `g(f(x))` | `x |> f() |> g()` |
+| `f(x, y)` | `x |> f(y)` |
+
+### Same result; the difference is readability {.example}
+Read `|>` as **"and then."** The left side goes into the **first argument** on the right.
+
+## The Pipe in Practice
+
+```{r}
+#| label: pipe
+
+round(mean(survey_scored$engagement), 2)             # mean first, then round
+
+survey_scored$engagement |> mean() |> round(2)       # same, in order
+
+survey_scored |>
+  subset(department != "HR") |>
+  nrow()
+```
+
+## The Placeholder `_`
+
+When the piped value is **not** the first argument:
+
+```{r}
+#| label: grow
+
+grow <- function(rate, principal, years = 1) {
+  return(principal * (1 + rate)^years)
+}
+
+1000 |> grow(0.07, principal = _, years = 10)   # = grow(0.07, principal = 1000, years = 10)
+
+survey_scored |>
+  lm(engagement ~ tenure_years, data = _) |>     # formula first, data second
+  coef()
+```
+
+### `x |> f(y, arg = _)` is the same as `f(y, arg = x)` {.alert}
+`_` must be used **with the argument name**: `x |> f(y, _)` is a syntax error.
+
+## `|>` and `%>%`
+
+| | `%>%` (magrittr) | `|>` (base R, 4.1+) |
+|--------------------------|---------------------------|------------------------------------|
+| Needs a package | Yes (loaded with tidyverse) | No |
+| Placeholder | `.` | `_` |
+| Placeholder without a name | Allowed: `x %>% f(y, .)` | Not allowed: `x |> f(y, arg = _)` |
+| Placeholder more than once | Allowed | Not allowed |
+| Parentheses | Optional: `x %>% f` | Required: `x |> f()` |
+
+```{r}
+#| label: magrittr-compare
+
+1000 %>% grow(0.07, ., years = 10)              # magrittr: unnamed . works
+1000 |> grow(0.07, principal = _, years = 10)   # base R: _ must be named
+```
+
+- This course uses `|>`; read `%>%` in older code the same way
+
+# Your Turn {#sec-your-turn}
+
+## Exercise
+
+### Tasks {.alert}
+7-point job-satisfaction scale; `js2` and `js4` are reverse-worded; "Prefer not to answer" = `99`
+
+1. Write `clean_missing(x, missing_code = 99)` that replaces `missing_code` with `NA`
+2. Use a `for` loop to apply `clean_missing()` to all four items
+3. Reverse-code `js2` and `js4` with `reverse_code()`. Which argument must change?
+4. Use `map_dbl()` to compute each item's mean, ignoring missing values
+5. Create `satisfaction`, each respondent's average, with `rowMeans()`
+6. `case_when()`: below 3 = `"Low"`, 3 to below 5 = `"Medium"`, 5 or above = `"High"`
+7. **Bonus:** run step 3 *before* step 2 on fresh data. What happens to the `99`s?
+
+## Exercise Data
+
+```{r}
+#| label: exercise-data
+
+js <- data.frame(
+  id  = 1:6,
+  js1 = c(6, 2, 7, 99, 5, 3),
+  js2 = c(2, 6, 1, 3, 99, 5),
+  js3 = c(5, 3, 6, 4, 6, 2),
+  js4 = c(3, 7, 2, 4, 2, 99)
+)
+```
+
+## Exercise: Solution (1--4)
+
+```{r}
+#| label: exercise-solution-1
+
+clean_missing <- function(x, missing_code = 99) {            # 1.
+  x[x %in% missing_code] <- NA
+  return(x)
+}
+
+js_items <- c("js1", "js2", "js3", "js4")
+for (item in js_items) js[[item]] <- clean_missing(js[[item]])   # 2.
+
+for (item in c("js2", "js4")) {                               # 3. scale_max = 7
+  js[[item]] <- reverse_code(js[[item]], scale_max = 7)
+}
+
+map_dbl(js[js_items], \(x) mean(x, na.rm = TRUE))             # 4.
+```
+
+## Exercise: Solution (5--7)
+
+```{r}
+#| label: exercise-solution-2
+
+js$satisfaction <- rowMeans(js[js_items], na.rm = TRUE)       # 5.
+
+js$satisfaction_level <- case_when(                          # 6.
+  is.na(js$satisfaction) ~ NA,
+  js$satisfaction < 3    ~ "Low",
+  js$satisfaction < 5    ~ "Medium",
+  .default               = "High"
+)
+js[, c("id", "satisfaction", "satisfaction_level")]
+```
+
+**7.** Nothing stops you: each `99` becomes `8 - 99 = -91`, silently dragging those scores far below the 1--7 range. Clean missing-value codes first.
+
+# Summary {#sec-summary}
+
+## Key Takeaways
+
+- **Operators work on whole vectors.** `&` and `|` on vectors; `&&` and `||` only inside `if ()`
+- **Obvious arguments by position, the rest by name**; the help page's Usage shows defaults
+- **A function is an espresso-machine button**: same steps, every time. Copied code three times? Write one
+- **Recode missing-value codes such as `99` to `NA` before computing anything**
+- **`if` decides about one value; `if_else()` and `case_when()` about every element**
+- **Loop over columns, files, or models, not rows.** `map()` is a shorter alternative
+- **`x |> f() |> g()` is `g(f(x))`**, in the order steps happen; `arg = _` pipes into another argument
+
+## Next Session and Further Reading
+
+**Next session:** importing real-world data from CSV, Excel, SPSS, and Stata files
+
+**Further reading**
+
+- R for Data Science (2e): [Functions](https://r4ds.hadley.nz/functions.html)
+- R for Data Science (2e): [Iteration](https://r4ds.hadley.nz/iteration.html)
+- [purrr documentation](https://purrr.tidyverse.org/)

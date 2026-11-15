@@ -1,0 +1,8 @@
+{
+  "company": "Acme Corp",
+  "fiscal_year": 2025,
+  "stores": [
+    {"store": "S01", "sales": 125000},
+    {"store": "S02", "sales": 98000}
+  ]
+}
