@@ -1,0 +1,522 @@
+---
+title: "Session 7: Visualizing Data"
+subtitle: "R Workshop for DBA Students"
+author: "Taikgun Song"
+date: today
+format:
+  beamer:
+    theme: Madrid
+    colortheme: default
+    aspectratio: 169
+    navigation: empty
+    toc: true
+    toc-title: "Outline"
+    number-sections: true
+    slide-level: 2
+    pdf-engine: xelatex
+    fig-width: 5.5         # plots: drawn at 5.5 x 2.4 inches ...
+    fig-height: 2.4
+    fig-align: center
+    include-in-header:
+      text: |
+        \usepackage{etoolbox}
+        \AtBeginEnvironment{Shaded}{\scriptsize}
+        % Tables one size smaller than body text
+        \AtBeginEnvironment{longtable}{\footnotesize}
+        \makeatletter
+        \def\verbatim@font{\scriptsize\ttfamily}
+        \makeatother
+        \AtBeginSection[]{\begin{frame}{Outline}\tableofcontents[currentsection]\end{frame}}
+knitr:
+  opts_chunk:
+    out.width: "75%"       # ... and shown at 75% of the slide width
+filters:
+  - small-output.lua   # smaller, gray R output (file must sit next to this one)
+execute:
+  echo: true
+  warning: true
+---
+
+<!--
+HOW THIS FILE WORKS (for the instructor; comments like this one do not render)
+- Companion to session7.qmd (the HTML handout). Same content, condensed into slides.
+- BEFORE RENDERING: put finance_example.csv in data/.
+- Plot size is set once in the header (fig-width, fig-height, out.width). A chunk can
+  override it, e.g. `#| fig-height: 3` for a taller plot.
+- Long plot code is split: one slide builds the plot object, the next slide shows it.
+- Rendering saves figure files to output/.
+- Needs small-output.lua in the same folder, and LaTeX (`quarto install tinytex`).
+-->
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+options(width = 70, useFancyQuotes = FALSE, pillar.width = 70)
+
+finance_raw <- read.csv("data/finance_example.csv", check.names = FALSE)
+names(finance_raw)[1] <- "ticker"
+
+fin_plot <- as_tibble(finance_raw) |>
+  select(ticker, sector = Sector, revenue = Revenue,
+         net_margin = `Net Profit Margin`, market_cap = `Market Cap`,
+         price_change_2015 = `2015 PRICE VAR [%]`) |>
+  filter(revenue > 0, !is.na(net_margin)) |>
+  mutate(super_sector = case_when(
+    sector %in% c("Basic Materials", "Consumer Cyclical",
+                  "Financial Services", "Real Estate")           ~ "Cyclical",
+    sector %in% c("Consumer Defensive", "Healthcare", "Utilities") ~ "Defensive",
+    sector %in% c("Communication Services", "Energy",
+                  "Industrials", "Technology")                     ~ "Sensitive"))
+```
+
+## Session Objectives
+
+By the end of this session, you will be able to:
+
+1. Make quick plots with base R: `hist()`, `plot()`, `boxplot()`, `barplot()`
+2. Explain the grammar of graphics: data, aesthetics, and geoms, built in layers
+3. Make histograms, scatter plots, and side-by-side boxplots with `ggplot2`
+4. Zoom in on a plot without silently dropping data
+5. Use color and `facet_wrap()` to compare groups
+6. Polish a figure for publication and save it with `ggsave()`
+
+## The Data and Why We Plot
+
+`fin_plot`: the finance data from Sessions 5--6, firms with positive revenue and a net margin, plus `super_sector`
+
+### Plot before you model {.example}
+A table of medians would never show a $96 trillion company, or net margins of minus 300,000%. A plot shows every observation at once.
+
+# Quick Looks with Base R {#sec-base}
+
+## `hist()`: One Numeric Variable
+
+```{r}
+#| label: base-hist
+
+hist(fin_plot$net_margin)
+```
+
+- One bar: a few extreme values stretch the axis so far that almost every firm lands in it
+
+## Look at the Middle, and Say So
+
+```{r}
+#| label: base-hist-middle
+
+middle <- fin_plot$net_margin[fin_plot$net_margin > -1 & fin_plot$net_margin < 1]
+hist(middle, breaks = 50, col = "steelblue",
+     main = "Net margin, firms between -100% and +100%", xlab = "Net margin")
+```
+
+## `plot()`: Two Numeric Variables
+
+```{r}
+#| label: base-plot
+
+ok <- fin_plot$market_cap > 0 & !is.na(fin_plot$market_cap)       # log needs > 0
+plot(fin_plot$revenue[ok], fin_plot$market_cap[ok], log = "xy",
+     xlab = "Revenue (USD)", ylab = "Market cap (USD)",
+     pch = 16, col = rgb(0, 0, 1, alpha = 0.2))                   # transparent dots
+```
+
+- **Log scale**: each step is ten times the previous one; spreads out skewed data
+
+## `boxplot()`: Side by Side, with Variable Width
+
+```{r}
+#| label: base-boxplot
+#| fig-height: 3
+
+par(mar = c(4, 11, 1, 1))                         # wide left margin for names
+boxplot(net_margin ~ sector, data = fin_plot, horizontal = TRUE, las = 1,
+        varwidth = TRUE, ylim = c(-1, 1), xlab = "Net margin", ylab = "")
+```
+
+- `varwidth = TRUE`: box width shows group size. `ylim` **zooms**: boxes use all data
+
+## `barplot()` and Common Arguments
+
+```{r}
+#| label: base-barplot
+#| fig-height: 2.6
+
+par(mar = c(4, 11, 1, 1))
+barplot(sort(table(fin_plot$sector)), horiz = TRUE, las = 1, xlab = "Number of firms")
+```
+
+- `main`, `xlab`, `ylab`, `col`, `xlim`, `ylim`, `log = "xy"`, `las = 1`, `par(mar = )`
+
+# The Grammar of Graphics {#sec-grammar}
+
+## Data + Aesthetics + Geoms, in Layers
+
+| Piece | What it is | Example |
+|------------------------|------------------------------------|-------------------------------------|
+| **Data** | A (tidy) data frame | `fin_plot` |
+| **Aesthetics** `aes()` | Column to visual property | `aes(x = revenue, y = market_cap)` |
+| **Geoms** `geom_*()` | The type of mark | `geom_point()` |
+
+```{r}
+#| label: grammar
+#| fig-height: 1.9
+
+ggplot(fin_plot, aes(x = net_margin)) +      # data and aesthetics: an empty canvas
+  geom_histogram(bins = 50)                   # a layer of bars
+```
+
+## `+`, not `|>`
+
+### ggplot2 is older than the pipe {.alert}
+Layers are joined with `+`, at the **end** of each line. A pipe can lead **into** a plot; after `ggplot()`, every step is `+`.
+
+```{r}
+#| label: pipe-into
+#| fig-height: 1.9
+
+fin_plot |>
+  filter(net_margin > -1, net_margin < 1) |>    # filter explicitly, and say so
+  ggplot(aes(x = net_margin)) +
+  geom_histogram(bins = 50)
+```
+
+## What ggplot2 Offers
+
+:::: {.columns}
+::: {.column width="50%"}
+| Chart | Geom |
+|----------------------|------------------------|
+| Histogram | `geom_histogram()` |
+| Density curve | `geom_density()` |
+| Scatter plot | `geom_point()` |
+| Trend line | `geom_smooth()` |
+| Boxplot | `geom_boxplot()` |
+| Violin plot | `geom_violin()` |
+:::
+::: {.column width="50%"}
+| Chart | Geom |
+|----------------------|------------------------|
+| Bars of counts | `geom_bar()` |
+| Bars of values | `geom_col()` |
+| Line (over time) | `geom_line()` |
+| Heatmap | `geom_tile()` |
+| Text labels | `geom_text()` |
+:::
+::::
+
+- All work the same way. See the ggplot2 reference and the Posit cheatsheet
+
+# Zooming without Dropping Data {#sec-zoom}
+
+## `coord_cartesian()` Zooms
+
+```{r}
+#| label: zoom-coord
+#| fig-height: 2.7
+
+ggplot(fin_plot, aes(x = net_margin, y = sector)) +
+  geom_boxplot() +
+  coord_cartesian(xlim = c(-1, 1))           # like a camera: all firms still used
+```
+
+## Scale Limits Drop Data
+
+```{r}
+#| label: zoom-limits
+#| fig-height: 2.7
+
+ggplot(fin_plot, aes(x = net_margin, y = sector)) +
+  geom_boxplot() +
+  scale_x_continuous(limits = c(-1, 1))      # removes firms BEFORE computing boxes
+```
+
+## Healthcare's Median Moved from a Loss to a Profit
+
+```{r}
+#| label: zoom-medians
+
+fin_plot |>
+  filter(sector == "Healthcare") |>
+  summarise(median_all_firms     = median(net_margin),
+            median_within_limits = median(net_margin[net_margin >= -1 & net_margin <= 1]))
+```
+
+### Zoom with `coord_cartesian()` {.alert}
+Scale limits (`xlim()`, `ylim()`, `scale_*(limits = )`) silently drop data and change boxes, medians, and trend lines. To exclude observations, filter explicitly and report it.
+
+# Scatter Plots {#sec-scatter}
+
+## Points and Log Scales
+
+```{r}
+#| label: scatter
+
+fin_scatter <- fin_plot |> filter(market_cap > 0)
+
+ggplot(fin_scatter, aes(x = revenue, y = market_cap)) +
+  geom_point(alpha = 0.3) +                  # transparency shows overlap
+  scale_x_log10() + scale_y_log10()
+```
+
+## Adding a Trend Line
+
+```{r}
+#| label: scatter-smooth
+
+ggplot(fin_scatter, aes(x = revenue, y = market_cap)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", formula = y ~ x) +   # straight line; band = confidence interval
+  scale_x_log10() + scale_y_log10()
+```
+
+## Mapping vs. Setting Color
+
+:::: {.columns}
+::: {.column width="50%"}
+**Mapped** inside `aes()`: shows data, adds a legend
+
+```{r}
+#| label: color-map
+#| fig-width: 4
+#| fig-height: 3
+#| out-width: "100%"
+
+ggplot(fin_scatter, aes(revenue, market_cap,
+                        color = super_sector)) +
+  geom_point(alpha = 0.4) +
+  scale_x_log10() + scale_y_log10()
+```
+:::
+::: {.column width="50%"}
+**Set** outside `aes()`: one color for all
+
+```{r}
+#| label: color-set
+#| fig-width: 4
+#| fig-height: 3
+#| out-width: "100%"
+
+ggplot(fin_scatter, aes(revenue, market_cap)) +
+  geom_point(alpha = 0.4,
+             color = "steelblue") +
+  scale_x_log10() + scale_y_log10()
+```
+:::
+::::
+
+# Side-by-Side Boxplots {#sec-boxplot}
+
+## Ordered, Horizontal, Variable Width
+
+```{r}
+#| label: boxplot-final
+#| fig-height: 2.8
+
+ggplot(fin_plot, aes(x = net_margin, y = fct_reorder(sector, net_margin))) +  # order by median
+  geom_boxplot(varwidth = TRUE) +                                              # width = group size
+  coord_cartesian(xlim = c(-1, 1))                                             # zoom, do not drop
+```
+
+## Reading the Boxplots
+
+- **Order** (`fct_reorder()`): Healthcare has the lowest median margin, Financial Services the highest
+- **Width** (`varwidth = TRUE`): Financial Services is the largest sector, Communication Services the smallest
+- **Horizontal**: long sector names stay readable
+
+### The same plot in base R {.example}
+`boxplot(net_margin ~ sector, data = fin_plot, horizontal = TRUE, varwidth = TRUE, ylim = c(-1, 1))`
+
+# Small Multiples with `facet_wrap()` {#sec-facets}
+
+## One Panel per Group
+
+```{r}
+#| label: facets
+
+ggplot(fin_scatter, aes(x = revenue, y = market_cap)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", formula = y ~ x) +
+  scale_x_log10() + scale_y_log10() +
+  facet_wrap(~ super_sector)                  # same axes, easy to compare
+```
+
+# Publication-Ready Figures {#sec-publication}
+
+## Labels, Scales, Theme, and Colors
+
+```{r}
+#| label: publication-plot
+
+dollar_short <- scales::label_dollar(scale_cut = scales::cut_short_scale())  # $1B, not 1e+09
+
+p_final <- ggplot(fin_scatter, aes(revenue, market_cap, color = super_sector)) +
+  geom_point(alpha = 0.5, size = 1) +
+  scale_x_log10(labels = dollar_short) +
+  scale_y_log10(labels = dollar_short) +
+  scale_color_viridis_d(end = 0.85) +                  # colorblind-friendly
+  labs(title   = "Larger firms are worth more, across all super sectors",
+       x = "Revenue (log scale)", y = "Market capitalization (log scale)",
+       color = "Super sector",
+       caption = "Source: financial statements of US-listed firms, 2014.") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+## The Result
+
+```{r}
+#| label: publication-show
+#| echo: false
+#| fig-height: 3.2
+#| out-width: "65%"
+
+p_final
+```
+
+- A title that **states the finding** tells the reader what to see
+
+## Saving with `ggsave()`
+
+```{r}
+#| label: ggsave
+
+dir.create("output", showWarnings = FALSE)
+ggsave("output/revenue_marketcap.png", p_final, width = 6.5, height = 4.5, dpi = 300)
+ggsave("output/revenue_marketcap.pdf", p_final, width = 6.5, height = 4.5)
+```
+
+| Format | Type | Use it for |
+|----------|----------------------------|------------------------------------------------|
+| PDF | Vector: sharp at any zoom | LaTeX papers; journals accepting vector figures |
+| PNG | Raster: pixels | Word, PowerPoint, web; `dpi = 300`+ for print |
+| TIFF | Raster | Some journals: `dpi = 600, compression = "lzw"` |
+
+- Size in inches = size in the document (single column about 3.5 in, full width about 7 in)
+
+# Your Turn {#sec-your-turn}
+
+## Exercise
+
+### Tasks (use `fin_plot`) {.alert}
+1. **Base R histogram** of `price_change_2015` for firms between -100% and +200%; 40 bars, title, label
+2. **Base R boxplots** of `price_change_2015` by `super_sector`, `varwidth`, zoomed to -100 to 100. Lowest median?
+3. **ggplot2 boxplots** by `sector`: horizontal, ordered, `varwidth`, `coord_cartesian()`. Which sector stands out?
+4. **Scatter:** `price_change_2015` vs. `net_margin` with a trend line. First all firms, zoomed: where is the line? Then **filter** to typical firms (margins -1 to 1, price changes -100 to 200) and facet by `super_sector`
+5. **Publish it:** a title stating the finding, `scales::label_percent()`, a caption, `theme_minimal()`; save as `output/margin_price.png`
+
+## Exercise: Solution (1--2)
+
+:::: {.columns}
+::: {.column width="50%"}
+```{r}
+#| label: exercise-solution-1
+#| fig-width: 4
+#| fig-height: 3
+#| out-width: "100%"
+
+pc <- fin_plot$price_change_2015
+hist(pc[pc > -100 & pc < 200], breaks = 40,
+     main = "2015 price change",
+     xlab = "Price change (%)", col = "grey70")
+```
+:::
+::: {.column width="50%"}
+```{r}
+#| label: exercise-solution-2
+#| fig-width: 4
+#| fig-height: 3
+#| out-width: "100%"
+
+boxplot(price_change_2015 ~ super_sector,
+        data = fin_plot, varwidth = TRUE,
+        ylim = c(-100, 100), xlab = "",
+        ylab = "Price change (%)")
+```
+:::
+::::
+
+- Lowest median: **Sensitive**, which includes Energy
+
+## Exercise: Solution (3)
+
+```{r}
+#| label: exercise-solution-3
+#| fig-height: 2.8
+
+ggplot(fin_plot, aes(x = price_change_2015, y = fct_reorder(sector, price_change_2015))) +
+  geom_boxplot(varwidth = TRUE) +
+  coord_cartesian(xlim = c(-100, 100)) +
+  labs(x = "Price change in 2015 (%)", y = NULL)
+```
+
+- **Energy**, far below every other sector: the 2014--2015 oil price collapse
+
+## Exercise: Solution (4), All Firms
+
+```{r}
+#| label: exercise-solution-4a
+
+ggplot(fin_plot, aes(x = net_margin, y = price_change_2015)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = "lm", formula = y ~ x) +
+  coord_cartesian(xlim = c(-1, 1), ylim = c(-100, 200))
+```
+
+- The line is fitted to **all** firms: a price change of over 2 million percent pulls it off the plot
+
+## Exercise: Solution (4), Typical Firms
+
+```{r}
+#| label: exercise-solution-4b
+
+fin_typical <- fin_plot |>
+  filter(between(net_margin, -1, 1), between(price_change_2015, -100, 200))
+
+p_margin <- ggplot(fin_typical, aes(x = net_margin, y = price_change_2015)) +
+  geom_point(alpha = 0.2) + geom_smooth(method = "lm", formula = y ~ x)
+
+p_margin + facet_wrap(~ super_sector)
+```
+
+- Upward for Cyclical and Defensive; nearly flat for Sensitive. Report how many firms you excluded
+
+## Exercise: Solution (5)
+
+```{r}
+#| label: exercise-solution-5
+
+p_margin_final <- p_margin +
+  facet_wrap(~ super_sector) +
+  scale_x_continuous(labels = scales::label_percent()) +   # labels only: drops nothing
+  labs(title   = "More profitable firms saw larger price gains in 2015, except in Sensitive sectors",
+       x = "Net margin, 2014", y = "Stock price change in 2015 (%)",
+       caption = "Excludes firms with net margins outside -100% to 100%\nor price changes outside -100% to 200%.") +
+  theme_minimal()
+
+ggsave("output/margin_price.png", p_margin_final, width = 6.5, height = 4, dpi = 300)
+```
+
+# Summary {#sec-summary}
+
+## Key Takeaways
+
+- **Plot before you model**: plots show what summaries hide
+- **Base R** for quick looks; `boxplot(varwidth = TRUE)` shows group sizes
+- **ggplot2**: data + `aes()` + geoms, in layers joined with `+`
+- **Zoom with `coord_cartesian()`**; scale limits silently drop data
+- **Scatter**: log scales, `alpha`, `geom_smooth()`; color inside `aes()` maps, outside sets
+- **Boxplots**: `fct_reorder()`, names on the y-axis, `varwidth = TRUE`
+- **`facet_wrap()`**: one panel per group
+- **Publish**: a title that states the finding, `scales` labels, a clean theme, viridis, `ggsave()`
+
+## Next Session and Further Reading
+
+**Next session:** descriptive statistics, model syntax, and publication-ready tables
+
+**Further reading**
+
+- R for Data Science (2e): [Data visualization](https://r4ds.hadley.nz/data-visualize.html), [Communication](https://r4ds.hadley.nz/communication.html)
+- [ggplot2 reference](https://ggplot2.tidyverse.org/reference/)
+- [Posit cheatsheets](https://posit.co/resources/cheatsheets/): Data visualization with ggplot2
