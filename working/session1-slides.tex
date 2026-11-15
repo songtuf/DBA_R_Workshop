@@ -1,4 +1,5 @@
 % Options for packages loaded elsewhere
+% Options for packages loaded elsewhere
 \PassOptionsToPackage{unicode}{hyperref}
 \PassOptionsToPackage{hyphens}{url}
 %
@@ -6,6 +7,7 @@
   ignorenonframetext,
   aspectratio=169,
 ]{beamer}
+\newif\ifbibliography
 \usepackage{pgfpages}
 \setbeamertemplate{caption}[numbered]
 \setbeamertemplate{caption label separator}{: }
@@ -14,24 +16,6 @@
 % Prevent slide breaks in the middle of a paragraph
 \widowpenalties 1 10000
 \raggedbottom
-\setbeamertemplate{part page}{
-  \centering
-  \begin{beamercolorbox}[sep=16pt,center]{part title}
-    \usebeamerfont{part title}\insertpart\par
-  \end{beamercolorbox}
-}
-\setbeamertemplate{section page}{
-  \centering
-  \begin{beamercolorbox}[sep=12pt,center]{part title}
-    \usebeamerfont{section title}\insertsection\par
-  \end{beamercolorbox}
-}
-\setbeamertemplate{subsection page}{
-  \centering
-  \begin{beamercolorbox}[sep=8pt,center]{part title}
-    \usebeamerfont{subsection title}\insertsubsection\par
-  \end{beamercolorbox}
-}
 \AtBeginPart{
   \frame{\partpage}
 }
@@ -44,23 +28,22 @@
 \AtBeginSubsection{
   \frame{\subsectionpage}
 }
-
-\usepackage{amsmath,amssymb}
 \usepackage{iftex}
 \ifPDFTeX
   \usepackage[T1]{fontenc}
   \usepackage[utf8]{inputenc}
   \usepackage{textcomp} % provide euro and other symbols
 \else % if luatex or xetex
-  \usepackage{unicode-math}
+  \usepackage{unicode-math} % this also loads fontspec
   \defaultfontfeatures{Scale=MatchLowercase}
   \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
 \fi
 \usepackage{lmodern}
+
 \usetheme[]{Madrid}
-\usecolortheme{default}
-\ifPDFTeX\else  
-    % xetex/luatex font selection
+\usecolortheme[]{default}
+\ifPDFTeX\else
+  % xetex/luatex font selection
 \fi
 % Use upquote if available, for straight quotes in verbatim environments
 \IfFileExists{upquote.sty}{\usepackage{upquote}}{}
@@ -78,10 +61,6 @@
 }{% if KOMA class
   \KOMAoptions{parskip=half}}
 \makeatother
-\usepackage{xcolor}
-\newif\ifbibliography
-\setlength{\emergencystretch}{3em} % prevent overfull lines
-\setcounter{secnumdepth}{5}
 
 \usepackage{color}
 \usepackage{fancyvrb}
@@ -101,7 +80,7 @@
 \newcommand{\CommentTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
 \newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
 \newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
-\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
 \newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
 \newcommand{\DecValTok}[1]{\textcolor[rgb]{0.68,0.00,0.00}{#1}}
 \newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
@@ -111,7 +90,7 @@
 \newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.28,0.35,0.67}{#1}}
 \newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.46,0.62}{#1}}
 \newcommand{\InformationTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
-\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{\textbf{#1}}}
 \newcommand{\NormalTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
 \newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{#1}}
 \newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.23,0.31}{#1}}
@@ -124,8 +103,8 @@
 \newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.13,0.47,0.30}{#1}}
 \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.37,0.37,0.37}{\textit{#1}}}
 
-\providecommand{\tightlist}{%
-  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}\usepackage{longtable,booktabs,array}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
 \usepackage{calc} % for calculating minipage widths
 \usepackage{caption}
 % Make caption package work with longtable
@@ -134,17 +113,33 @@
 \makeatother
 \usepackage{graphicx}
 \makeatletter
-\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
-\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
-\makeatother
-% Scale images if necessary, so that they will not overflow the page
-% margins by default, and it is still possible to overwrite the defaults
-% using explicit options in \includegraphics[width, height, ...]{}
-\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
 % Set default figure placement to htbp
-\makeatletter
 \def\fps@figure{htbp}
 \makeatother
+
+
+
+
+
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+
+
+ 
+
 
 \usepackage{etoolbox}
 \AtBeginEnvironment{Shaded}{\scriptsize}
@@ -152,10 +147,6 @@
 \def\verbatim@font{\scriptsize\ttfamily}
 \makeatother
 \AtBeginSection[]{\begin{frame}{Outline}\tableofcontents[currentsection]\end{frame}}
-\makeatletter
-\makeatother
-\makeatletter
-\makeatother
 \makeatletter
 \@ifpackageloaded{caption}{}{\usepackage{caption}}
 \AtBeginDocument{%
@@ -192,50 +183,51 @@
 \newcommand*\listoflistings{\listof{codelisting}{List of Listings}}
 \makeatother
 \makeatletter
+\makeatother
+\makeatletter
 \@ifpackageloaded{caption}{}{\usepackage{caption}}
 \@ifpackageloaded{subcaption}{}{\usepackage{subcaption}}
 \makeatother
-\makeatletter
-\@ifpackageloaded{tcolorbox}{}{\usepackage[skins,breakable]{tcolorbox}}
-\makeatother
-\makeatletter
-\@ifundefined{shadecolor}{\definecolor{shadecolor}{rgb}{.97, .97, .97}}
-\makeatother
-\makeatletter
-\makeatother
-\makeatletter
-\makeatother
-\ifLuaTeX
-  \usepackage{selnolig}  % disable illegal ligatures
-\fi
-\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+
+\usepackage{bookmark}
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
-\urlstyle{same} % disable monospaced font for URLs
+\urlstyle{same}
+% fallback for those not using the hyperref driver hyperxmp:
+\makeatletter
+\@ifundefined{xmpquote}{\newcommand{\xmpquote}[1]{#1}}{}
+\makeatother
 \hypersetup{
   pdftitle={Session 1: Setting Up R and RStudio},
   pdfauthor={Taikgun Song},
   hidelinks,
   pdfcreator={LaTeX via pandoc}}
 
-\title{Session 1: Setting Up R and RStudio}
-\subtitle{R Workshop for DBA Students}
+
+\title{\texorpdfstring{Session 1: Setting Up R and
+RStudio}{Session 1: Setting Up R and RStudio}}
+\subtitle{\texorpdfstring{R Workshop for DBA
+Students}{R Workshop for DBA Students}}
 \author{Taikgun Song}
-\date{2026-11-06}
+\date{2026-11-15}
 
 \begin{document}
 \frame{\titlepage}
-\ifdefined\Shaded\renewenvironment{Shaded}{\begin{tcolorbox}[frame hidden, sharp corners, breakable, borderline west={3pt}{0pt}{shadecolor}, boxrule=0pt, enhanced, interior hidden]}{\end{tcolorbox}}\fi
 
 \renewcommand*\contentsname{Outline}
 \begin{frame}[allowframebreaks]
   \frametitle{Outline}
-  \tableofcontents[hideallsubsections]
+  \setcounter{tocdepth}{3}
+  \tableofcontents
 \end{frame}
+\setcounter{tocdepth}{3}
+\tableofcontents
+}
+
 \begin{frame}
 \end{frame}
 
-\begin{frame}{Session Objectives}
-\protect\hypertarget{session-objectives}{}
+\begin{frame}{0.1 Session Objectives}
+\protect\phantomsection\label{session-objectives}
 By the end of this session, you will be able to:
 
 \begin{enumerate}
@@ -258,13 +250,12 @@ By the end of this session, you will be able to:
 \end{enumerate}
 \end{frame}
 
-\hypertarget{sec-what}{%
-\section{R and RStudio}\label{sec-what}}
+\section{1. R and RStudio}\label{sec-what}
 
-\begin{frame}{R and RStudio}
-\protect\hypertarget{r-and-rstudio}{}
+\begin{frame}{1.1 R and RStudio}
+\protect\phantomsection\label{r-and-rstudio}
 \begin{columns}[T]
-\begin{column}{0.5\textwidth}
+\begin{column}{0.5\linewidth}
 \textbf{R}
 
 \begin{itemize}
@@ -278,7 +269,7 @@ By the end of this session, you will be able to:
 \end{itemize}
 \end{column}
 
-\begin{column}{0.5\textwidth}
+\begin{column}{0.5\linewidth}
 \textbf{RStudio}
 
 \begin{itemize}
@@ -293,22 +284,22 @@ By the end of this session, you will be able to:
 \end{column}
 \end{columns}
 
-\begin{exampleblock}{R is the engine, RStudio is the dashboard}
-\protect\hypertarget{r-is-the-engine-rstudio-is-the-dashboard}{}
+\begin{exampleblock}{1.1.1 R is the engine, RStudio is the dashboard}
+\protect\phantomsection\label{r-is-the-engine-rstudio-is-the-dashboard}
 You need both, and you install them separately. You open RStudio, and
 RStudio runs R for you.
 \end{exampleblock}
 \end{frame}
 
-\hypertarget{sec-install}{%
-\section{Installing R and RStudio}\label{sec-install}}
+\section{2. Installing R and RStudio}\label{sec-install}
 
-\begin{frame}[fragile]{Step 1: Know Your Computer}
-\protect\hypertarget{sec-know-computer}{}
+\begin{frame}[fragile]{2.1 Step 1: Know Your Computer}
+\protect\phantomsection\label{sec-know-computer}
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2439}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3415}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4146}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2439}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3415}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4146}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Computer
@@ -326,9 +317,10 @@ Apple M\ldots{}} \(\rightarrow\) \texttt{arm64} \newline **Processor:
 Intel** \(\rightarrow\) \texttt{x86\_64} \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 
-\begin{alertblock}{Mac users}
-\protect\hypertarget{mac-users}{}
+\begin{alertblock}{2.1.1 Mac users}
+\protect\phantomsection\label{mac-users}
 \begin{itemize}
 \tightlist
 \item
@@ -345,8 +337,8 @@ Intel** \(\rightarrow\) \texttt{x86\_64} \\
 \end{alertblock}
 \end{frame}
 
-\begin{frame}[fragile]{Steps 2 and 3: Install R, then RStudio}
-\protect\hypertarget{steps-2-and-3-install-r-then-rstudio}{}
+\begin{frame}[fragile]{2.2 Steps 2 and 3: Install R, then RStudio}
+\protect\phantomsection\label{steps-2-and-3-install-r-then-rstudio}
 \textbf{R} from CRAN: \url{https://cloud.r-project.org/}
 
 \begin{itemize}
@@ -377,8 +369,8 @@ RStudio comes with \textbf{Quarto} built in.
 newer editor from Posit for R and Python. This course uses RStudio.
 \end{frame}
 
-\begin{frame}{Keep R Up to Date}
-\protect\hypertarget{keep-r-up-to-date}{}
+\begin{frame}{2.3 Keep R Up to Date}
+\protect\phantomsection\label{keep-r-up-to-date}
 \begin{itemize}
 \tightlist
 \item
@@ -392,8 +384,8 @@ newer editor from Posit for R and Python. This course uses RStudio.
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Special Cases}
-\protect\hypertarget{special-cases}{}
+\begin{frame}[fragile]{2.4 Special Cases}
+\protect\phantomsection\label{special-cases}
 \textbf{Windows on ARM} (Snapdragon ``Copilot+ PCs'')
 
 \begin{itemize}
@@ -426,8 +418,8 @@ newer editor from Posit for R and Python. This course uses RStudio.
 \end{Shaded}
 \end{frame}
 
-\begin{frame}{Posit Cloud: A Backup Option}
-\protect\hypertarget{sec-cloud}{}
+\begin{frame}{2.5 Posit Cloud: A Backup Option}
+\protect\phantomsection\label{sec-cloud}
 \url{https://posit.cloud}: RStudio in your web browser, nothing to
 install
 
@@ -446,27 +438,27 @@ Useful when:
 Free plan \(\rightarrow\) \textbf{New Project \(\rightarrow\) New
 RStudio Project} (check current usage limits)
 
-\begin{exampleblock}{For your own research}
-\protect\hypertarget{for-your-own-research}{}
+\begin{exampleblock}{2.5.1 For your own research}
+\protect\phantomsection\label{for-your-own-research}
 A local installation is still better: faster, no usage limits, and your
 data stays on your computer.
 \end{exampleblock}
 \end{frame}
 
-\hypertarget{sec-tour}{%
-\section{A Tour of RStudio}\label{sec-tour}}
+\section{3. A Tour of RStudio}\label{sec-tour}
 
-\begin{frame}{The Four Panes}
-\protect\hypertarget{the-four-panes}{}
-\includegraphics[width=0.75\textwidth,height=\textheight]{images/rstudio_panes.png}
+\begin{frame}{3.1 The Four Panes}
+\protect\phantomsection\label{the-four-panes}
+\includegraphics[width=0.75\linewidth,height=\textheight,keepaspectratio]{images/rstudio_panes.png}
 \end{frame}
 
-\begin{frame}[fragile]{What Each Pane Is For}
-\protect\hypertarget{what-each-pane-is-for}{}
+\begin{frame}[fragile]{3.2 What Each Pane Is For}
+\protect\phantomsection\label{what-each-pane-is-for}
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2069}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2414}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.5517}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2069}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2414}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.5517}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Pane
@@ -486,20 +478,22 @@ commands \\
 packages, help pages \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 
-\begin{exampleblock}{Script or Console?}
-\protect\hypertarget{script-or-console}{}
+\begin{exampleblock}{3.2.1 Script or Console?}
+\protect\phantomsection\label{script-or-console}
 Anything you want to keep goes in a \textbf{script} or Quarto document.
 If it only exists in the Console, it is gone when you close RStudio.
 \end{exampleblock}
 \end{frame}
 
-\begin{frame}[fragile]{Keyboard Shortcuts}
-\protect\hypertarget{keyboard-shortcuts}{}
+\begin{frame}[fragile]{3.3 Keyboard Shortcuts}
+\protect\phantomsection\label{keyboard-shortcuts}
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3636}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4091}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2273}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3636}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4091}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2273}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Action
@@ -525,16 +519,18 @@ Show all shortcuts & \texttt{Alt} + \texttt{Shift} + \texttt{K} &
 \texttt{Option} + \texttt{Shift} + \texttt{K} \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 \end{frame}
 
-\begin{frame}{Settings to Change on Day One}
-\protect\hypertarget{sec-settings}{}
+\begin{frame}{3.4 Settings to Change on Day One}
+\protect\phantomsection\label{sec-settings}
 \textbf{Tools \(\rightarrow\) Global Options}
 
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3000}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3667}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3667}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Location
@@ -552,10 +548,11 @@ General \(\rightarrow\) Basic & Save workspace to .RData on exit &
 Code \(\rightarrow\) Saving & Default text encoding & \textbf{UTF-8} \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 \end{frame}
 
-\begin{frame}[fragile]{Why Not Save the Workspace?}
-\protect\hypertarget{why-not-save-the-workspace}{}
+\begin{frame}[fragile]{3.5 Why Not Save the Workspace?}
+\protect\phantomsection\label{why-not-save-the-workspace}
 \begin{itemize}
 \tightlist
 \item
@@ -566,8 +563,8 @@ Code \(\rightarrow\) Saving & Default text encoding & \textbf{UTF-8} \\
   \textbf{no longer have code for}
 \end{itemize}
 
-\begin{alertblock}{Reproducibility}
-\protect\hypertarget{reproducibility}{}
+\begin{alertblock}{3.5.1 Reproducibility}
+\protect\phantomsection\label{reproducibility}
 Your \textbf{script} should be the complete record of your analysis. If
 you can restart R, rerun the script, and get the same results, your work
 is reproducible.
@@ -581,11 +578,10 @@ is reproducible.
 \end{alertblock}
 \end{frame}
 
-\hypertarget{sec-packages}{%
-\section{R Packages}\label{sec-packages}}
+\section{4. R Packages}\label{sec-packages}
 
-\begin{frame}[fragile]{What Is a Package?}
-\protect\hypertarget{what-is-a-package}{}
+\begin{frame}[fragile]{4.1 What Is a Package?}
+\protect\phantomsection\label{what-is-a-package}
 \begin{itemize}
 \tightlist
 \item
@@ -597,10 +593,11 @@ is reproducible.
   each time
 \end{itemize}
 
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.2222}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3704}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.4074}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.2222}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3704}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4074}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Step
@@ -617,10 +614,11 @@ Load & \texttt{library(name)} & Every session, at the top of every
 script \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 \end{frame}
 
-\begin{frame}[fragile]{Installing Packages}
-\protect\hypertarget{installing-packages}{}
+\begin{frame}[fragile]{4.2 Installing Packages}
+\protect\phantomsection\label{installing-packages}
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{install.packages}\NormalTok{(}\StringTok{"readxl"}\NormalTok{)                       }\CommentTok{\# one package (note the quotes)}
@@ -631,8 +629,8 @@ script \\
 Or: \textbf{Packages} pane \(\rightarrow\) \textbf{Install}
 \(\rightarrow\) type the name
 
-\begin{exampleblock}{If R asks a question during installation}
-\protect\hypertarget{if-r-asks-a-question-during-installation}{}
+\begin{exampleblock}{4.2.1 If R asks a question during installation}
+\protect\phantomsection\label{if-r-asks-a-question-during-installation}
 \begin{itemize}
 \tightlist
 \item
@@ -645,8 +643,8 @@ Or: \textbf{Packages} pane \(\rightarrow\) \textbf{Install}
 \end{exampleblock}
 \end{frame}
 
-\begin{frame}[fragile]{The Course Install List}
-\protect\hypertarget{sec-course-packages}{}
+\begin{frame}[fragile]{4.3 The Course Install List}
+\protect\phantomsection\label{sec-course-packages}
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{install.packages}\NormalTok{(}\FunctionTok{c}\NormalTok{(}
@@ -664,8 +662,8 @@ Or: \textbf{Packages} pane \(\rightarrow\) \textbf{Install}
 \end{Shaded}
 \end{frame}
 
-\begin{frame}[fragile]{Check the Installation}
-\protect\hypertarget{check-the-installation}{}
+\begin{frame}[fragile]{4.4 Check the Installation}
+\protect\phantomsection\label{check-the-installation}
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{course\_pkgs }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{"tidyverse"}\NormalTok{, }\StringTok{"here"}\NormalTok{, }\StringTok{"readxl"}\NormalTok{, }\StringTok{"haven"}\NormalTok{, }\StringTok{"car"}\NormalTok{,}
@@ -675,12 +673,16 @@ Or: \textbf{Packages} pane \(\rightarrow\) \textbf{Install}
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
    tidyverse         here       readxl        haven          car 
         TRUE         TRUE         TRUE         TRUE         TRUE 
    gtsummary modelsummary    rmarkdown       quarto 
        FALSE        FALSE         TRUE        FALSE 
 \end{verbatim}
+
+\endgroup
 
 \begin{itemize}
 \item
@@ -694,30 +696,86 @@ Or: \textbf{Packages} pane \(\rightarrow\) \textbf{Install}
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Loading Packages}
-\protect\hypertarget{loading-packages}{}
+\begin{frame}[fragile]{4.5 Loading Packages}
+\protect\phantomsection\label{loading-packages}
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{library}\NormalTok{(tidyverse)}
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
-Warning: package 'tidyverse' was built under R version 4.3.3
+Warning: package 'tidyverse' was built under R version 4.5.3
 \end{verbatim}
+
+\endgroup
+
+\begingroup\tiny\color{darkgray}
+
+\begin{verbatim}
+Warning: package 'ggplot2' was built under R version 4.5.3
+\end{verbatim}
+
+\endgroup
+
+\begingroup\tiny\color{darkgray}
+
+\begin{verbatim}
+Warning: package 'tidyr' was built under R version 4.5.3
+\end{verbatim}
+
+\endgroup
+
+\begingroup\tiny\color{darkgray}
+
+\begin{verbatim}
+Warning: package 'readr' was built under R version 4.5.3
+\end{verbatim}
+
+\endgroup
+
+\begingroup\tiny\color{darkgray}
+
+\begin{verbatim}
+Warning: package 'purrr' was built under R version 4.5.3
+\end{verbatim}
+
+\endgroup
+
+\begingroup\tiny\color{darkgray}
+
+\begin{verbatim}
+Warning: package 'forcats' was built under R version 4.5.3
+\end{verbatim}
+
+\endgroup
+
+\begingroup\tiny\color{darkgray}
+
+\begin{verbatim}
+Warning: package 'lubridate' was built under R version 4.5.3
+\end{verbatim}
+
+\endgroup
+
+\begingroup\tiny\color{darkgray}
 
 \begin{verbatim}
 -- Attaching core tidyverse packages -------------- tidyverse 2.0.0 --
-v dplyr     1.1.2     v readr     2.2.0
-v forcats   1.0.1     v stringr   1.5.0
-v ggplot2   3.4.2     v tibble    3.2.1
-v lubridate 1.9.2     v tidyr     1.3.0
-v purrr     1.0.1     
+v dplyr     1.2.0     v readr     2.2.0
+v forcats   1.0.1     v stringr   1.6.0
+v ggplot2   4.0.3     v tibble    3.3.1
+v lubridate 1.9.5     v tidyr     1.3.2
+v purrr     1.2.2     
 -- Conflicts -------------------------------- tidyverse_conflicts() --
 x dplyr::filter() masks stats::filter()
 x dplyr::lag()    masks stats::lag()
 i Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
 \end{verbatim}
+
+\endgroup
 
 \begin{itemize}
 \tightlist
@@ -728,9 +786,9 @@ i Use the conflicted package (<http://conflicted.r-lib.org/>) to force all confl
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{\texttt{package::function()} and
+\begin{frame}[fragile]{4.6 \texttt{package::function()} and
 \texttt{require()}}
-\protect\hypertarget{packagefunction-and-require}{}
+\protect\phantomsection\label{packagefunction-and-require}
 Use one function without loading the whole package:
 
 \begin{Shaded}
@@ -739,9 +797,13 @@ Use one function without loading the whole package:
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
-[1] "C:/Users/USER/Desktop/DBA_R_Workshop"
+[1] "C:/Users/songt/Desktop/DBA_R_Workshop"
 \end{verbatim}
+
+\endgroup
 
 \begin{itemize}
 \tightlist
@@ -761,8 +823,8 @@ Use one function without loading the whole package:
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Updating and Removing Packages}
-\protect\hypertarget{updating-and-removing-packages}{}
+\begin{frame}[fragile]{4.7 Updating and Removing Packages}
+\protect\phantomsection\label{updating-and-removing-packages}
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{update.packages}\NormalTok{(}\AttributeTok{ask =} \ConstantTok{FALSE}\NormalTok{)   }\CommentTok{\# update everything (or Packages pane \textgreater{} Update)}
@@ -783,8 +845,8 @@ Use one function without loading the whole package:
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{\texttt{sessionInfo()}}
-\protect\hypertarget{sec-session-info}{}
+\begin{frame}[fragile]{4.8 \texttt{sessionInfo()}}
+\protect\phantomsection\label{sec-session-info}
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{sessionInfo}\NormalTok{()      }\CommentTok{\# output is long: run it in the Console to see yours}
@@ -800,11 +862,10 @@ Use one function without loading the whole package:
 \end{itemize}
 \end{frame}
 
-\hypertarget{sec-paths}{%
-\section{Working Directories and File Paths}\label{sec-paths}}
+\section{5. Working Directories and File Paths}\label{sec-paths}
 
-\begin{frame}[fragile]{Folders Form a Tree}
-\protect\hypertarget{folders-form-a-tree}{}
+\begin{frame}[fragile]{5.1 Folders Form a Tree}
+\protect\phantomsection\label{folders-form-a-tree}
 \begin{verbatim}
 C:/                              <- the root: top of the tree (Mac: /)
 `-- Users/
@@ -832,8 +893,9 @@ C:/                              <- the root: top of the tree (Mac: /)
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Folders and Paths}
-\protect\hypertarget{folders-and-paths}{}
+\begin{frame}[fragile]{5.2 Folders and Paths}
+\protect\phantomsection\label{folders-and-paths}
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 Kind of path & Example \\
@@ -846,7 +908,9 @@ Relative & \texttt{data/survey.csv} (from the \textbf{current
 folder}) \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 Symbol & Meaning \\
@@ -857,17 +921,18 @@ Symbol & Meaning \\
 \texttt{.} / \texttt{..} & The current folder / one level up \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 
-\begin{alertblock}{Windows users}
-\protect\hypertarget{windows-users}{}
+\begin{alertblock}{5.2.1 Windows users}
+\protect\phantomsection\label{windows-users}
 Use forward slashes (\texttt{C:/Users/tek}) or double backslashes
 (\texttt{C:\textbackslash{}\textbackslash{}Users\textbackslash{}\textbackslash{}tek}).
 A single \texttt{\textbackslash{}} is a special character in R.
 \end{alertblock}
 \end{frame}
 
-\begin{frame}[fragile]{The Working Directory}
-\protect\hypertarget{the-working-directory}{}
+\begin{frame}[fragile]{5.3 The Working Directory}
+\protect\phantomsection\label{the-working-directory}
 The folder R treats as ``here.'' Every relative path starts from it.
 
 \begin{Shaded}
@@ -876,9 +941,13 @@ The folder R treats as ``here.'' Every relative path starts from it.
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
-[1] "C:/Users/USER/Desktop/DBA_R_Workshop/working"
+[1] "C:/Users/songt/Desktop/DBA_R_Workshop/working"
 \end{verbatim}
+
+\endgroup
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -892,8 +961,8 @@ Or: \textbf{Session \(\rightarrow\) Set Working Directory
 \(\rightarrow\) Choose Directory}
 \end{frame}
 
-\begin{frame}[fragile]{Why \texttt{setwd()} Causes Problems}
-\protect\hypertarget{why-setwd-causes-problems}{}
+\begin{frame}[fragile]{5.4 Why \texttt{setwd()} Causes Problems}
+\protect\phantomsection\label{why-setwd-causes-problems}
 A script starting with \texttt{setwd("C:/Users/tek/...")} only works on
 \textbf{Tek's computer}.
 
@@ -909,15 +978,15 @@ It breaks when you:
   Switch between Windows and Mac
 \end{itemize}
 
-\begin{exampleblock}{The solution}
-\protect\hypertarget{the-solution}{}
+\begin{exampleblock}{5.4.1 The solution}
+\protect\phantomsection\label{the-solution}
 Never type your computer's address into a script. Use \textbf{RStudio
 Projects}.
 \end{exampleblock}
 \end{frame}
 
-\begin{frame}[fragile]{RStudio Projects}
-\protect\hypertarget{sec-projects}{}
+\begin{frame}[fragile]{5.5 RStudio Projects}
+\protect\phantomsection\label{sec-projects}
 \begin{itemize}
 \tightlist
 \item
@@ -938,8 +1007,8 @@ New Directory \(\rightarrow\) New Project \(\rightarrow\) name it
 \(\rightarrow\) Recent Projects
 \end{frame}
 
-\begin{frame}[fragile]{A Folder Layout That Works}
-\protect\hypertarget{a-folder-layout-that-works}{}
+\begin{frame}[fragile]{5.6 A Folder Layout That Works}
+\protect\phantomsection\label{a-folder-layout-that-works}
 The same kind of tree, with the project folder at the top. Paths inside
 it stay the same wherever the folder sits.
 
@@ -952,8 +1021,8 @@ dba-r-workshop/
 `-- session2.qmd
 \end{verbatim}
 
-\begin{alertblock}{Avoid OneDrive, iCloud, and Dropbox}
-\protect\hypertarget{avoid-onedrive-icloud-and-dropbox}{}
+\begin{alertblock}{5.6.1 Avoid OneDrive, iCloud, and Dropbox}
+\protect\phantomsection\label{avoid-onedrive-icloud-and-dropbox}
 Synced folders can lock files and cause confusing errors. On Windows,
 \textbf{Documents} is often synced to OneDrive. Use
 \texttt{C:/R-projects} (Windows) or
@@ -961,8 +1030,8 @@ Synced folders can lock files and cause confusing errors. On Windows,
 \end{alertblock}
 \end{frame}
 
-\begin{frame}[fragile]{The \texttt{here} Package}
-\protect\hypertarget{sec-here}{}
+\begin{frame}[fragile]{5.7 The \texttt{here} Package}
+\protect\phantomsection\label{sec-here}
 \begin{itemize}
 \tightlist
 \item
@@ -979,9 +1048,21 @@ Synced folders can lock files and cause confusing errors. On Windows,
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
-here() starts at C:/Users/USER/Desktop/DBA_R_Workshop
+Warning: package 'here' was built under R version 4.5.3
 \end{verbatim}
+
+\endgroup
+
+\begingroup\tiny\color{darkgray}
+
+\begin{verbatim}
+here() starts at C:/Users/songt/Desktop/DBA_R_Workshop
+\end{verbatim}
+
+\endgroup
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -989,9 +1070,13 @@ here() starts at C:/Users/USER/Desktop/DBA_R_Workshop
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
-[1] "C:/Users/USER/Desktop/DBA_R_Workshop"
+[1] "C:/Users/songt/Desktop/DBA_R_Workshop"
 \end{verbatim}
+
+\endgroup
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -999,36 +1084,56 @@ here() starts at C:/Users/USER/Desktop/DBA_R_Workshop
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
-[1] "C:/Users/USER/Desktop/DBA_R_Workshop/data/survey.csv"
+[1] "C:/Users/songt/Desktop/DBA_R_Workshop/data/survey.csv"
 \end{verbatim}
 
-\begin{exampleblock}{The habit to build}
-\protect\hypertarget{the-habit-to-build}{}
+\endgroup
+
+\begin{exampleblock}{5.7.1 The habit to build}
+\protect\phantomsection\label{the-habit-to-build}
 One Project per research project · raw data in \texttt{data/} · paths
 with \texttt{here()} · no \texttt{setwd()} in scripts you keep
 \end{exampleblock}
 \end{frame}
 
-\hypertarget{sec-files}{%
-\section{Accessing Files from R}\label{sec-files}}
+\section{6. Accessing Files from R}\label{sec-files}
 
-\begin{frame}[fragile]{Listing and Creating Files}
-\protect\hypertarget{listing-and-creating-files}{}
+\begin{frame}[fragile]{6.1 Listing and Creating Files}
+\protect\phantomsection\label{listing-and-creating-files}
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{list.files}\NormalTok{()                         }\CommentTok{\# files in the working directory}
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
- [1] "session1-slides.aux"       "session1-slides.log"      
- [3] "session1-slides.pdf"       "session1-slides.qmd"      
- [5] "session1-slides.rmarkdown" "session1-slides.tex"      
- [7] "session1-slides.vrb"       "session1-slides_files"    
- [9] "session1.html"             "session1.qmd"             
-[11] "session2-slides.qmd"       "session2.qmd"             
+ [1] "data"                      "output"                   
+ [3] "session1-slides.aux"       "session1-slides.log"      
+ [5] "session1-slides.pdf"       "session1-slides.qmd"      
+ [7] "session1-slides.rmarkdown" "session1-slides.tex"      
+ [9] "session1-slides.vrb"       "session1.html"            
+[11] "session1.qmd"              "session2-slides.aux"      
+[13] "session2-slides.log"       "session2-slides.pdf"      
+[15] "session2-slides.qmd"       "session2-slides.tex"      
+[17] "session2-slides.vrb"       "session2.html"            
+[19] "session2.qmd"              "session3-slides.qmd"      
+[21] "session3.html"             "session3.qmd"             
+[23] "session4-slides.qmd"       "session4.qmd"             
+[25] "session5-slides.pdf"       "session5-slides.qmd"      
+[27] "session5.html"             "session5.qmd"             
+[29] "session6-slides.qmd"       "session6.html"            
+[31] "session6.qmd"              "session7-slides.qmd"      
+[33] "session7.html"             "session7.qmd"             
+[35] "session8-slides.qmd"       "session8.html"            
+[37] "session8.qmd"              "small-output.lua"         
 \end{verbatim}
+
+\endgroup
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1036,10 +1141,18 @@ with \texttt{here()} · no \texttt{setwd()} in scripts you keep
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
-[1] "session1-slides.qmd" "session1.qmd"        "session2-slides.qmd"
-[4] "session2.qmd"       
+ [1] "session1-slides.qmd" "session1.qmd"        "session2-slides.qmd"
+ [4] "session2.qmd"        "session3-slides.qmd" "session3.qmd"       
+ [7] "session4-slides.qmd" "session4.qmd"        "session5-slides.qmd"
+[10] "session5.qmd"        "session6-slides.qmd" "session6.qmd"       
+[13] "session7-slides.qmd" "session7.qmd"        "session8-slides.qmd"
+[16] "session8.qmd"       
 \end{verbatim}
+
+\endgroup
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1048,13 +1161,17 @@ with \texttt{here()} · no \texttt{setwd()} in scripts you keep
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
 [1] TRUE
 \end{verbatim}
+
+\endgroup
 \end{frame}
 
-\begin{frame}[fragile]{Writing a CSV File}
-\protect\hypertarget{writing-a-csv-file}{}
+\begin{frame}[fragile]{6.2 Writing a CSV File}
+\protect\phantomsection\label{writing-a-csv-file}
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{sales }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
@@ -1069,9 +1186,13 @@ with \texttt{here()} · no \texttt{setwd()} in scripts you keep
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
 [1] TRUE
 \end{verbatim}
+
+\endgroup
 
 \begin{itemize}
 \tightlist
@@ -1081,14 +1202,16 @@ with \texttt{here()} · no \texttt{setwd()} in scripts you keep
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]{Reading a CSV File}
-\protect\hypertarget{reading-a-csv-file}{}
+\begin{frame}[fragile]{6.3 Reading a CSV File}
+\protect\phantomsection\label{reading-a-csv-file}
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{sales\_in }\OtherTok{\textless{}{-}} \FunctionTok{read.csv}\NormalTok{(}\FunctionTok{here}\NormalTok{(}\StringTok{"data"}\NormalTok{, }\StringTok{"sales.csv"}\NormalTok{))}
 \FunctionTok{str}\NormalTok{(sales\_in)        }\CommentTok{\# structure: column names and types}
 \end{Highlighting}
 \end{Shaded}
+
+\begingroup\tiny\color{darkgray}
 
 \begin{verbatim}
 'data.frame':   4 obs. of  3 variables:
@@ -1097,15 +1220,21 @@ with \texttt{here()} · no \texttt{setwd()} in scripts you keep
  $ stores : int  12 9 15 8
 \end{verbatim}
 
+\endgroup
+
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{dim}\NormalTok{(sales\_in)        }\CommentTok{\# rows and columns}
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
 [1] 4 3
 \end{verbatim}
+
+\endgroup
 
 \begin{itemize}
 \tightlist
@@ -1116,22 +1245,22 @@ with \texttt{here()} · no \texttt{setwd()} in scripts you keep
   Session 4 covers Excel, SPSS, Stata, and messier CSV files
 \end{itemize}
 
-\begin{alertblock}{Deleting files}
-\protect\hypertarget{deleting-files}{}
+\begin{alertblock}{6.3.1 Deleting files}
+\protect\phantomsection\label{deleting-files}
 \texttt{file.remove()} and \texttt{unlink()} delete
 \textbf{permanently}, without the Recycle Bin or Trash.
 \end{alertblock}
 \end{frame}
 
-\hypertarget{sec-quarto}{%
-\section{Scripts and Quarto Documents}\label{sec-quarto}}
+\section{7. Scripts and Quarto Documents}\label{sec-quarto}
 
-\begin{frame}[fragile]{Two Kinds of Files}
-\protect\hypertarget{two-kinds-of-files}{}
+\begin{frame}[fragile]{7.1 Two Kinds of Files}
+\protect\phantomsection\label{two-kinds-of-files}
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 4\tabcolsep) * \real{0.3333}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 \end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
@@ -1148,6 +1277,7 @@ homework \\
 Output & Results in the Console & HTML, Word, or PDF \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 
 \begin{itemize}
 \tightlist
@@ -1162,8 +1292,8 @@ Output & Results in the Console & HTML, Word, or PDF \\
 \texttt{K})
 \end{frame}
 
-\begin{frame}[fragile]{Anatomy of a Quarto Document}
-\protect\hypertarget{anatomy-of-a-quarto-document}{}
+\begin{frame}[fragile]{7.2 Anatomy of a Quarto Document}
+\protect\phantomsection\label{anatomy-of-a-quarto-document}
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{{-}{-}{-}}
@@ -1199,8 +1329,9 @@ Output & Results in the Console & HTML, Word, or PDF \\
 \end{enumerate}
 \end{frame}
 
-\begin{frame}[fragile]{Chunk Options}
-\protect\hypertarget{chunk-options}{}
+\begin{frame}[fragile]{7.3 Chunk Options}
+\protect\phantomsection\label{chunk-options}
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}ll@{}}
 \toprule\noalign{}
 Option & Effect \\
@@ -1214,23 +1345,23 @@ output \\
 \texttt{\#\textbar{}\ label:\ name} & Name the chunk \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 
 Insert a chunk: \texttt{Ctrl} + \texttt{Alt} + \texttt{I} (Windows),
 \texttt{Cmd} + \texttt{Option} + \texttt{I} (Mac)
 
-\begin{alertblock}{Rendering starts from a clean slate}
-\protect\hypertarget{rendering-starts-from-a-clean-slate}{}
+\begin{alertblock}{7.3.1 Rendering starts from a clean slate}
+\protect\phantomsection\label{rendering-starts-from-a-clean-slate}
 Render runs your document top to bottom in a \textbf{fresh R session}.
 Objects created in the Console do not exist there. ``Object not found''
 means the code that creates it is missing from the document.
 \end{alertblock}
 \end{frame}
 
-\hypertarget{sec-help}{%
-\section{Getting Help}\label{sec-help}}
+\section{8. Getting Help}\label{sec-help}
 
-\begin{frame}[fragile]{Help Inside R}
-\protect\hypertarget{help-inside-r}{}
+\begin{frame}[fragile]{8.1 Help Inside R}
+\protect\phantomsection\label{help-inside-r}
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{?mean                         }\CommentTok{\# help page for a function}
@@ -1247,11 +1378,12 @@ means the code that creates it is missing from the document.
 run them)
 \end{frame}
 
-\begin{frame}[fragile]{Reading Error Messages}
-\protect\hypertarget{reading-error-messages}{}
+\begin{frame}[fragile]{8.2 Reading Error Messages}
+\protect\phantomsection\label{reading-error-messages}
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.4091}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.5909}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.4091}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5909}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Message
@@ -1273,16 +1405,17 @@ path: check \texttt{getwd()}, use \texttt{here()} \\
 comma, quote, or bracket \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 
-\begin{exampleblock}{Warnings are not errors}
-\protect\hypertarget{warnings-are-not-errors}{}
+\begin{exampleblock}{8.2.1 Warnings are not errors}
+\protect\phantomsection\label{warnings-are-not-errors}
 A \textbf{warning} means R did something but wants you to check it. An
 \textbf{error} means R stopped.
 \end{exampleblock}
 \end{frame}
 
-\begin{frame}[fragile]{Asking for Help Well}
-\protect\hypertarget{asking-for-help-well}{}
+\begin{frame}[fragile]{8.3 Asking for Help Well}
+\protect\phantomsection\label{asking-for-help-well}
 Include:
 
 \begin{enumerate}
@@ -1300,8 +1433,8 @@ Include:
 Writing the question carefully often helps you find the answer yourself.
 \end{frame}
 
-\begin{frame}{Using AI Assistants}
-\protect\hypertarget{using-ai-assistants}{}
+\begin{frame}{8.4 Using AI Assistants}
+\protect\phantomsection\label{using-ai-assistants}
 \begin{itemize}
 \tightlist
 \item
@@ -1320,15 +1453,15 @@ Writing the question carefully often helps you find the answer yourself.
   \end{itemize}
 \end{itemize}
 
-\begin{alertblock}{Research data}
-\protect\hypertarget{research-data}{}
+\begin{alertblock}{8.4.1 Research data}
+\protect\phantomsection\label{research-data}
 Never paste confidential or identifiable research data into an AI tool
 without checking your IRB protocol and your institution's policy.
 \end{alertblock}
 \end{frame}
 
-\begin{frame}{Good Places to Learn More}
-\protect\hypertarget{good-places-to-learn-more}{}
+\begin{frame}{8.5 Good Places to Learn More}
+\protect\phantomsection\label{good-places-to-learn-more}
 \begin{itemize}
 \tightlist
 \item
@@ -1346,14 +1479,14 @@ without checking your IRB protocol and your institution's policy.
 \end{itemize}
 \end{frame}
 
-\hypertarget{sec-troubleshoot}{%
-\section{Troubleshooting Installation}\label{sec-troubleshoot}}
+\section{9. Troubleshooting Installation}\label{sec-troubleshoot}
 
-\begin{frame}[fragile]{Common Problems}
-\protect\hypertarget{common-problems}{}
+\begin{frame}[fragile]{9.1 Common Problems}
+\protect\phantomsection\label{common-problems}
+{\def\LTcaptype{none} % do not increment counter
 \begin{longtable}[]{@{}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.4091}}
-  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.5909}}@{}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.4091}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5909}}@{}}
 \toprule\noalign{}
 \begin{minipage}[b]{\linewidth}\raggedright
 Problem
@@ -1376,17 +1509,17 @@ A package needs ``compilation'' and fails & Answer \textbf{no}, or
 install Rtools / Command Line Tools \\
 \bottomrule\noalign{}
 \end{longtable}
+}
 
 Where your packages are stored: \texttt{.libPaths()}
 \end{frame}
 
-\hypertarget{sec-your-turn}{%
-\section{Your Turn}\label{sec-your-turn}}
+\section{10. Your Turn}\label{sec-your-turn}
 
-\begin{frame}[fragile]{Exercise}
-\protect\hypertarget{exercise}{}
-\begin{alertblock}{Tasks}
-\protect\hypertarget{tasks}{}
+\begin{frame}[fragile]{10.1 Exercise}
+\protect\phantomsection\label{exercise}
+\begin{alertblock}{10.1.1 Tasks}
+\protect\phantomsection\label{tasks}
 \begin{enumerate}
 \tightlist
 \item
@@ -1414,8 +1547,8 @@ Where your packages are stored: \texttt{.libPaths()}
 \end{alertblock}
 \end{frame}
 
-\begin{frame}[fragile]{Exercise Data}
-\protect\hypertarget{exercise-data}{}
+\begin{frame}[fragile]{10.2 Exercise Data}
+\protect\phantomsection\label{exercise-data}
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{employees }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
@@ -1427,8 +1560,8 @@ Where your packages are stored: \texttt{.libPaths()}
 \end{Shaded}
 \end{frame}
 
-\begin{frame}[fragile]{Exercise: Solution (Steps 5 and 6)}
-\protect\hypertarget{exercise-solution-steps-5-and-6}{}
+\begin{frame}[fragile]{10.3 Exercise: Solution (Steps 5 and 6)}
+\protect\phantomsection\label{exercise-solution-steps-5-and-6}
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{library}\NormalTok{(here)}
@@ -1441,6 +1574,8 @@ Where your packages are stored: \texttt{.libPaths()}
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
 'data.frame':   5 obs. of  3 variables:
  $ name      : chr  "Ana" "Ben" "Chloe" "Dev" ...
@@ -1448,15 +1583,21 @@ Where your packages are stored: \texttt{.libPaths()}
  $ salary    : int  68000 72000 95000 61000 102000
 \end{verbatim}
 
+\endgroup
+
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{mean}\NormalTok{(employees\_in}\SpecialCharTok{$}\NormalTok{salary)}
 \end{Highlighting}
 \end{Shaded}
 
+\begingroup\tiny\color{darkgray}
+
 \begin{verbatim}
 [1] 79600
 \end{verbatim}
+
+\endgroup
 
 \begin{itemize}
 \tightlist
@@ -1467,11 +1608,10 @@ Where your packages are stored: \texttt{.libPaths()}
 \end{itemize}
 \end{frame}
 
-\hypertarget{sec-summary}{%
-\section{Summary}\label{sec-summary}}
+\section{11. Summary}\label{sec-summary}
 
-\begin{frame}[fragile]{Key Takeaways}
-\protect\hypertarget{key-takeaways}{}
+\begin{frame}[fragile]{11.1 Key Takeaways}
+\protect\phantomsection\label{key-takeaways}
 \begin{itemize}
 \tightlist
 \item
@@ -1497,6 +1637,7 @@ Where your packages are stored: \texttt{.libPaths()}
 
 \textbf{Next session:} data types and structures
 \end{frame}
+
 
 
 

@@ -1,0 +1,32 @@
+\frametitle{2.4 Special Cases}
+\protect\phantomsection\label{special-cases}
+\textbf{Windows on ARM} (Snapdragon ``Copilot+ PCs'')
+
+\begin{itemize}
+\tightlist
+\item
+  Native R for Windows 11 exists, but is still \textbf{experimental};
+  some packages fail
+\item
+  Most reliable option: \textbf{Posit Cloud}
+\end{itemize}
+
+\textbf{Compiling packages from source} (rarely needed)
+
+\begin{itemize}
+\tightlist
+\item
+  Windows: \textbf{Rtools}, matching your R version
+\item
+  Mac: Command Line Tools: run \texttt{xcode-select\ -\/-install} in
+  Terminal
+\item
+  Install only if an error message tells you to
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{install.packages}\NormalTok{(}\StringTok{"pkgbuild"}\NormalTok{)              }\CommentTok{\# optional check after installing them}
+\NormalTok{pkgbuild}\SpecialCharTok{::}\FunctionTok{has\_build\_tools}\NormalTok{(}\AttributeTok{debug =} \ConstantTok{TRUE}\NormalTok{)   }\CommentTok{\# TRUE = ready to compile packages}
+\end{Highlighting}
+\end{Shaded}
