@@ -1,0 +1,224 @@
+---
+title: "Multiple Regression I: The Linear Model"
+subtitle: "MAR 7628 — Quantitative Data Analysis | Residency 1, Day 1"
+author: "Tek Song"
+format:
+  revealjs:
+    theme: [default]
+    slide-number: true
+    code-line-numbers: true
+    df-print: kable
+    echo: true
+execute:
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| echo: false
+library(tidyverse)
+library(broom)
+storemax <- read_csv("storemax.csv") |>
+  mutate(region = factor(region,
+    levels = c("Southeast","Northeast","Midwest","West")))
+```
+
+# Why Regression? {background-color="#1a3a5c"}
+
+## The workhorse of business research
+
+- Open any issue of *JMR*, *Marketing Science*, or *JM*: the headline
+  evidence is very often a **regression table**
+- Research questions of the form:
+  *"How is Y related to X, holding everything else constant?"*
+- Today: **run it and read it**. Tomorrow: interrogate it.
+
+::: notes
+Show 2–3 journal abstracts/tables here (screenshots).
+Pick your own go-to papers; read one DV + one coefficient aloud.
+:::
+
+## When to use multiple regression
+
+- **Outcome (Y):** one continuous variable
+- **Predictors (X):** any mix — continuous, categorical, many of them
+- **Question:** association between each X and Y, *adjusting for the others*
+- Not (yet) a causal claim — that conversation is tomorrow
+
+## Meet StoreMax (our running example)
+
+A national retail chain, 400 stores, one week of data:
+
+```{r}
+glimpse(storemax)
+```
+
+::: notes
+This dataset follows us all weekend. Every method we learn
+interrogates this same company.
+:::
+
+# A Little Theory (No Proofs) {background-color="#1a3a5c"}
+
+## The model
+
+$$\text{sales}_i = \beta_0 + \beta_1\,\text{ad\_spend}_i + \beta_2\,\text{price}_i + \varepsilon_i$$
+
+- The model describes the **conditional mean** of Y given the Xs
+- $\beta_k$: expected change in Y for a one-unit change in $X_k$,
+  **holding the other Xs constant**
+- "Holding constant" is the entire point of *multiple* regression
+
+## How the line is chosen: OLS
+
+- OLS picks the $\beta$s that minimize the sum of **squared residuals**
+- Residual = actual − predicted: what the model missed
+
+```{r}
+#| echo: false
+#| fig-height: 4
+ggplot(storemax, aes(ad_spend, sales)) +
+  geom_point(alpha = .3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Ad spend ($000/week)", y = "Weekly sales (units)")
+```
+
+::: notes
+One intuitive picture; no derivation. "Best" has a precise meaning —
+we give it a name (BLUE) tomorrow.
+:::
+
+# Running It in R {background-color="#1a3a5c"}
+
+## `lm()`: one line
+
+```{r}
+m1 <- lm(sales ~ ad_spend + price + store_size, data = storemax)
+```
+
+That's it. The work is in **reading** what comes back.
+
+## Anatomy of `summary()` — the whole output
+
+```{r}
+summary(m1)
+```
+
+::: notes
+Spend real time here. Walk every line on the next slides.
+:::
+
+## Anatomy, line by line
+
+| Piece | What it is | What it is **not** |
+|---|---|---|
+| `Estimate` | the fitted $\beta$ | a causal effect |
+| `Std. Error` | uncertainty in $\beta$ | the spread of Y |
+| `t value`, `Pr(>|t|)` | test of $\beta = 0$ | effect size |
+| `R-squared` | share of **variance** explained | share of sales explained |
+| `F-statistic` | all slopes = 0, jointly | model "correctness" |
+
+## Output → Sentence {.smaller}
+
+```{r}
+#| echo: false
+tidy(m1) |> mutate(across(where(is.numeric), ~round(., 2)))
+```
+
+**What we can now say:**
+
+> "Holding price and store size constant, each additional $1,000 of weekly
+> ad spend is associated with roughly ___ additional units sold
+> (b = ___, p ___ )."
+
+**Fill in the blanks. Every number in the table has a sentence.**
+
+## Mis-interpretation check ❌
+
+Would a reviewer let these through?
+
+1. "Ad spend **drives** sales up by 100 units." 
+2. "The model **explains 60% of sales**."
+3. "Price is not significant, so price **has no effect**."
+
+::: notes
+(1) causal verb from observational data; (2) variance ≠ level;
+(3) absence of evidence ≠ evidence of absence. Recurring segment —
+same game appears on quizzes.
+:::
+
+# Categorical Predictors {background-color="#1a3a5c"}
+
+## Dummy variables: region
+
+```{r}
+m2 <- lm(sales ~ ad_spend + price + store_size + region,
+         data = storemax)
+tidy(m2) |> mutate(across(where(is.numeric), ~round(., 1)))
+```
+
+- R picks a **reference category** (first level: Southeast)
+- Each coefficient = that region **vs. the reference**, holding the rest constant
+
+## Output → Sentence
+
+> "Compared with Southeast stores (the reference), Northeast stores sell
+> about ___ more units per week, holding ad spend, price, and store
+> size constant."
+
+- Changing the reference changes the coefficients, **not the model**
+- `relevel()` demo: same fit, different comparisons
+
+## Standardized vs. unstandardized
+
+```{r}
+m2_std <- lm(scale(sales) ~ scale(ad_spend) + scale(price) +
+             scale(store_size) + region, data = storemax)
+```
+
+- Unstandardized: real units → best for **substantive** sentences
+- Standardized: SD units → comparing **relative importance** within a model
+- Never compare standardized βs **across** different samples/models
+
+# Lab {background-color="#2c5f2d"}
+
+## Lab 1: Your turn with StoreMax
+
+1. Fit `sales ~ ad_spend + price + store_size + region`
+2. Produce the tidy coefficient table (`broom::tidy()`)
+3. **Deliverable: write the three sentences** this table supports —
+   one continuous predictor, one dummy, one about model fit
+4. Swap with a neighbor: would a reviewer let their sentences through?
+
+::: notes
+Deliverable is prose, not output. ~40 min. Circulate; collect the two
+best and two most instructive wrong sentences for debrief.
+:::
+
+# Reading the Literature {background-color="#1a3a5c"}
+
+## Interpretation audit: a published table
+
+- [Insert Table from your chosen JMR/JM paper]
+- Text covered: **you write the sentences** the table supports
+- Then: reveal what the authors wrote — compare
+
+::: notes
+Pick a paper whose Table has a continuous predictor, a dummy, and R².
+The audit format beats "here's how they used it."
+:::
+
+## Looking ahead to tomorrow
+
+- Today we **ran and read** the model
+- Tomorrow we ask: **can we trust it?**
+  - The assumptions behind the output (Gauss-Markov)
+  - Diagnostics in R, and repairs
+  - Building and comparing models; interactions
+  - And a puzzle: what happens to the price coefficient when we add
+    one more variable…
+
+::: notes
+The cliffhanger is Simpson's: price looks ~flat until
+market_affluence enters, then turns sharply negative. Don't spoil it.
+:::
