@@ -1,14 +1,15 @@
 ---
-title: "Multiple Regression I: The Linear Model"
-subtitle: "MAR 7628 — Quantitative Data Analysis | Residency 1, Day 1"
-author: "Tek Song"
+title: "Multiple Regression I:<br>The Linear Model"
+subtitle: "MAR 7628 — Quantitative Data Analysis<br>Residency 1, Day 1 (Fri, Jan 22)"
+author: "Your Name"
 format:
   revealjs:
-    theme: [default]
+    theme: [simple, mar7628.scss]
     slide-number: true
-    code-line-numbers: true
+    code-line-numbers: false
     df-print: kable
     echo: true
+    scrollable: true
 execute:
   warning: false
   message: false
@@ -18,207 +19,729 @@ execute:
 #| echo: false
 library(tidyverse)
 library(broom)
+
 storemax <- read_csv("storemax.csv") |>
   mutate(region = factor(region,
-    levels = c("Southeast","Northeast","Midwest","West")))
+    levels = c("Southeast", "Northeast", "Midwest", "West")))
 ```
 
-# Why Regression? {background-color="#1a3a5c"}
+## Learning agenda
 
-## The workhorse of business research
-
-- Open any issue of *JMR*, *Marketing Science*, or *JM*: the headline
-  evidence is very often a **regression table**
-- Research questions of the form:
-  *"How is Y related to X, holding everything else constant?"*
-- Today: **run it and read it**. Tomorrow: interrogate it.
+- **Foundations:** the model and its notation
+- **The model's promises:** the assumptions behind every regression
+- **Reading and extracting** the output table
+- **What "holding constant" means:** partial correlations and standardization
 
 ::: notes
-Show 2–3 journal abstracts/tables here (screenshots).
-Pick your own go-to papers; read one DV + one coefficient aloud.
+Four 50-minute blocks, 10-minute break after each; ~30 min slack.
+Block 3 is the fullest (extraction exercise). Spend the slack there first.
+Prediction and logs are covered tomorrow (Deck 2).
+:::
+
+# Block 1 — Foundations {background-color="#1a3a5c"}
+
+## Why regression?
+
+- Open any issue of *JMR*, *Marketing Science*, *JM*, or *JCR*: much of the
+  headline evidence is a **regression table**
+- Research questions of the form:
+  *"How is Y related to X, holding everything else constant?"*
+- Today: **the model, what it assumes, and how to read it**
+- Tomorrow: check the assumptions, build and compare models
+
+::: notes
+[INSERT 1–2 journal table screenshots here: your chosen papers.]
+Read one DV and one coefficient aloud. Don't explain yet: "by 5 pm
+today you'll read this table fluently."
 :::
 
 ## When to use multiple regression
 
-- **Outcome (Y):** one continuous variable
-- **Predictors (X):** any mix — continuous, categorical, many of them
-- **Question:** association between each X and Y, *adjusting for the others*
-- Not (yet) a causal claim — that conversation is tomorrow
+- **Outcome (Y):** one continuous variable (sales, satisfaction, spend)
+- **Predictors (X):** any mix of continuous and categorical
+- **Question:** the association between each X and Y, *adjusting for the others*
+- **Not (yet) a causal claim.** We come back to this tomorrow
 
-## Meet StoreMax (our running example)
+## The family map: one model, many outfits
 
-A national retail chain, 400 stores, one week of data:
+```{mermaid}
+%%| echo: false
+flowchart TD
+  LM["<b>Linear model</b><br/>y = α + βx + ε"]
+  T["t-test<br/>(one binary X)"]
+  AN["ANOVA<br/>(categorical Xs only)"]
+  ANC["ANCOVA<br/>(categorical + continuous X)"]
+  LOG["Logistic regression<br/>(binary Y, logit link)"]
+  RL["Ridge / lasso<br/>(same model + penalty)"]
+  PCA["PCA / EFA<br/>(no Y — a different family)"]
+  T --> LM
+  LM --> AN
+  AN --> ANC
+  LM --> LOG
+  LM --> RL
+  LM -.-> PCA
+  style LM fill:#f4a261,stroke:#333,stroke-width:2px
+```
+
+::: notes
+This map returns at the start of every topic, with the current method
+highlighted. PCA/EFA sit outside on purpose: no outcome variable, so
+they leave the regression family. Saying so gives "everything is
+regression" an honest boundary.
+:::
+
+## You've already run a regression
+
+Two-group t-test (equal variances) vs. `lm()` with one dummy:
+
+```{r}
+two <- storemax |>
+  filter(region %in% c("Southeast", "Northeast")) |>
+  droplevels()
+
+tt  <- t.test(sales ~ region, data = two, var.equal = TRUE)
+fit <- lm(sales ~ region, data = two)
+
+c(t_test_t  = unname(tt$statistic),
+  lm_t      = summary(fit)$coefficients["regionNortheast", "t value"],
+  lm_F      = unname(summary(fit)$fstatistic["value"]),
+  t_squared = unname(tt$statistic)^2)
+```
+
+- Same |t|, same p-value, and **t² = F**
+- (The sign of t can flip: it depends only on which group is subtracted from which)
+
+## The model
+
+$$y_i = \alpha + \beta_1 x_{1i} + \beta_2 x_{2i} + \cdots + \beta_k x_{ki} + \varepsilon_i$$
+
+- One equation that holds **for each observation** $i = 1, \dots, n$ (each store)
+- $\beta_j$: expected change in $y$ for a one-unit change in $x_j$,
+  **holding the other $x$s constant**
+- $\varepsilon_i$: everything about store $i$ the $x$s don't capture
+
+## How the line is chosen: OLS
+
+- **Ordinary Least Squares:** choose the intercept and slopes that make the
+  **sum of squared residuals** as small as possible
+- Residual = actual − predicted: what the model missed
+
+```{r}
+#| echo: false
+#| fig-height: 4.2
+m_simple <- lm(sales ~ ad_spend, data = storemax)
+storemax |>
+  mutate(fit = fitted(m_simple)) |>
+  slice_sample(n = 60) |>
+  ggplot(aes(ad_spend, sales)) +
+  geom_segment(aes(xend = ad_spend, yend = fit), alpha = .4, colour = "firebrick") +
+  geom_point(alpha = .6) +
+  geom_abline(intercept = coef(m_simple)[1], slope = coef(m_simple)[2],
+              colour = "steelblue", linewidth = 1) +
+  labs(x = "Ad spend ($000/week)", y = "Weekly sales (units)",
+       subtitle = "Red segments = residuals. OLS minimizes the sum of their squares.")
+```
+
+::: notes
+No normal equations, no proof. In Block 2 we name why OLS is "best"
+(BLUE) and under which conditions.
+:::
+
+## Notation: the textbook {.dense}
+
+| Symbol | Meaning |
+|:----------|:------------------------------------------------------------------------------|
+| $n$ | sample size (number of observations) |
+| $k$ | number of predictors |
+| $i$ | observation index (store $i$) |
+| $\alpha$ | intercept |
+| $\beta_j$ | **population** coefficient for predictor $j$: unknown |
+| $\hat\beta_j$ | **estimate** of $\beta_j$ from our sample |
+| $\varepsilon_i$ | **error**: unobservable |
+| $\hat y_i$ | **fitted (predicted)** value for observation $i$ |
+| $e_i = y_i - \hat y_i$ | **residual**: computable |
+
+**Fitted model (no error term; it's a prediction):**
+
+$$\hat y_i = \hat\alpha + \hat\beta_1 x_{1i} + \cdots + \hat\beta_k x_{ki}$$
+
+::: notes
+The hat is the core idea: no hat = the truth we want; hat = what our data
+give us. ε vs. e matters in Block 2: assumptions are about ε, but we can
+only check them using e, so diagnostics are always indirect. Mention
+β₀ as the alternative intercept notation verbally.
+:::
+
+## Notation you'll see in papers
+
+Recognize these; you don't need to use them:
+
+- **Matrix form:** $\mathbf{y} = \mathbf{X}\boldsymbol\beta + \boldsymbol\varepsilon$, the same model written compactly
+- **$b$ vs. $\hat\beta$:** both mean "the estimated coefficient"
+- **⚠️ In many APA-style tables, "β" means the *standardized* coefficient**
+  and "b" or "B" the unstandardized one. This clashes with the textbook use of β
+  as the population value. Always check the table note.
+- **$y_{it}$:** observation $i$ at time $t$ (panel data); **$y_{ij}$:** person $i$ in firm $j$
+
+# Block 2 — The Model's Promises {background-color="#1a3a5c"}
+
+## Why assumptions, before any output?
+
+- Soon we'll read standard errors, t-values, p-values, and confidence intervals
+- Every one of those numbers is valid **only if the model's promises hold**
+- So first: **what does the model promise, about each of its parts?**
+- Today: understand the promises. **Tomorrow: check them in R**
+
+## The equation has three parts
+
+$$y_i = \underbrace{\alpha + \beta_1 x_{1i} + \cdots + \beta_k x_{ki}}_{\text{systematic part}}
+\;+\; \underbrace{\varepsilon_i}_{\text{error}}$$
+
+| Part of the equation | Promise |
+|:-------------------------------|:--------------------------------------------------------------|
+| **Systematic part** | **1. Linearity / correct specification** |
+| **The $x$'s** | **2. No perfect collinearity** |
+| **The error $\varepsilon_i$** | **3. Exogeneity** · **4. Homoscedasticity** · **5. Independence** |
+| *(optional extra)* | *Normality of the errors: outside Gauss-Markov* |
+
+## Promise 1: Linearity / correct specification
+
+**The promise (systematic part):** $y$ really is $\alpha + \beta_1 x_1 + \cdots + \beta_k x_k$ on average:
+the right **form** and the right **variables**.
+
+- **Plain English:** a straight-line relationship for each $x$ (holding the others
+  constant), and nothing important left out or wrongly put in
+- **StoreMax example:** ad spend may have **diminishing returns**: the first $5k
+  of ads helps far more than the next $5k. A straight line would misdescribe that.
+- **If violated:** **biased coefficients**. The story itself is wrong.
+- **Tomorrow:** residual plots, component-plus-residual plots; remedies such as logs
+
+## Promise 2: No perfect collinearity
+
+**The promise (the $x$'s):** no predictor is an **exact** linear combination of the others.
+
+- **Plain English:** each $x$ must carry some information the others don't
+- **StoreMax example:** including store size in **sq ft *and* sq meters**. They are
+  the same variable, so R can't separate them (it drops one: `NA` in the output).
+- **Near**-collinearity is the practical problem: ad spend and store size move
+  together, so their separate effects are hard to pin down
+- **If violated:** perfect → can't estimate; near → **unstable estimates, inflated SEs**
+- **Tomorrow:** variance inflation factors (VIF)
+
+## Promise 3: Exogeneity
+
+**The promise (the error):** $E[\varepsilon_i \mid X] = 0$. The error is **unrelated to the $x$'s**.
+
+- **Plain English:** whatever we left out of the model is not systematically
+  tied to the predictors we included
+- **StoreMax examples:**
+  - *Omitted variable:* local competition lowers both prices and sales, and it's not in the model
+  - *Reverse causality:* head office sends **more ad budget to struggling stores**,
+    so low sales cause high ad spend, not the other way round
+- **If violated:** **biased coefficients** (the endogeneity problem)
+- **Tomorrow:** this one is **not testable from residuals**. It is argued from
+  theory and research design.
+
+::: notes
+This is the assumption reviewers ask about most ("what about
+endogeneity?"). Keep market_affluence out of the examples: it's
+tomorrow's Simpson's-paradox surprise.
+:::
+
+## Promise 4: Homoscedasticity
+
+**The promise (the error):** $Var(\varepsilon_i) = \sigma^2$, **the same for every observation**.
+
+- **Plain English:** the model's misses are about equally large everywhere
+- **StoreMax example:** big stores' weekly sales swing much more than small
+  stores'. The spread of the errors grows with store size.
+- **If violated:** coefficients are fine, but **standard errors are wrong**,
+  so p-values and CIs can't be trusted
+- **Tomorrow:** scale-location plot, Breusch-Pagan test; remedy: robust standard errors
+
+## Promise 5: Independence
+
+**The promise (the error):** $\varepsilon_i$ is unrelated to $\varepsilon_j$ for different observations.
+
+- **Plain English:** one observation's miss tells us nothing about another's
+- **StoreMax examples:**
+  - Stores in the **same city** share local shocks (a storm, a festival)
+  - The **same store measured every week** is not 52 independent observations
+- **If violated:** coefficients are fine, but **standard errors are too small**:
+  false confidence
+- **Tomorrow:** mostly a **design question**: how was the data collected?
+  Remedy: clustered standard errors
+
+## And normality?
+
+**Not a Gauss-Markov assumption.** An optional extra: $\varepsilon_i \sim N(0, \sigma^2)$.
+
+- Matters only for **exact inference in small samples**
+- With reasonable $n$, the central limit theorem does the heavy lifting
+- **Common misconception:** "the data must be normal." No: it's the **errors**,
+  and even then only sort of
+- **Tomorrow:** Q-Q plots (preferred over formal normality tests)
+
+## The payoff: Gauss-Markov
+
+If Promises 1–5 hold, OLS is the
+
+**B**est **L**inear **U**nbiased **E**stimator (**BLUE**)
+
+- **Unbiased:** on average, $\hat\beta_j$ hits the true $\beta_j$
+- **Best:** no other linear unbiased estimator has smaller variance
+- No proof needed: this is the reason OLS is the default
+
+## Two kinds of failure
+
+| Violations that **bias coefficients** | Violations that **corrupt standard errors** |
+|:-------------------------------------------|:-------------------------------------------|
+| Misspecification (1), endogeneity (3) | Heteroscedasticity (4), dependence (5) |
+| Your **story** is wrong | Your story may be right, but your **certainty** is overstated |
+| Hard to fix: needs theory and design | Often patchable (robust / clustered SEs) |
+
+**The first column is fatal; the second is fixable.**
+
+::: notes
+Collinearity (2) sits apart: it doesn't bias anything, it just makes
+estimates imprecise. Mention it verbally.
+:::
+
+## Promises are about ε; we only see e
+
+- The promises concern the **errors** $\varepsilon_i$, which we never observe
+- We check them indirectly, using the **residuals** $e_i = y_i - \hat y_i$
+- Some can't be checked from residuals at all: **exogeneity is argued, not tested**
+- Keep the five promises in mind as we read the output next: **every SE and
+  p-value we see leans on them**
+
+# Block 3 — Reading the Output {background-color="#1a3a5c"}
+
+## Notation: R's formula
+
+The model
+
+$$y_i = \alpha + \beta_1 x_{1i} + \beta_2 x_{2i} + \varepsilon_i$$
+
+is written in R as
+
+```r
+lm(y ~ x1 + x2, data = mydata)
+```
+
+| In R | Meaning |
+|:--------------------|:--------------------------------------------------------------------|
+| `~` | "is modeled by": outcome on the left, predictors on the right |
+| `+` | add a predictor |
+| *(nothing)* | the intercept $\alpha$ is included **automatically** |
+| *(nothing)* | the error $\varepsilon_i$ is **never written** |
+| `factor(x)` | treat `x` as categorical (creates dummies) |
+| `I(x^2)` | do arithmetic inside the formula |
+
+::: notes
+Interaction operators (`:` and `*`) and log transformations come
+tomorrow.
+:::
+
+## Notation: R's output {.dense}
+
+How the labels in `summary()` map onto the textbook symbols:
+
+| In R output | Symbol | Meaning |
+|:----------------------|:----------------|:---------------------------------------------------|
+| `(Intercept)` | $\hat\alpha$ | estimated intercept |
+| `Estimate` | $\hat\beta_j$ | estimated coefficient |
+| `Std. Error` | $SE(\hat\beta_j)$ | uncertainty in the estimate |
+| `t value` | $\hat\beta_j / SE(\hat\beta_j)$ | test statistic for $\beta_j = 0$ |
+| `fitted(m)` | $\hat y_i$ | fitted (predicted) values |
+| `residuals(m)` | $e_i$ | residuals |
+| `Residual standard error` | $\hat\sigma$ | estimated SD of the errors |
+| `degrees of freedom` | $n - k - 1$ | residual df |
+
+**This is your key for reading `summary()`.**
+
+## Meet StoreMax {.dense}
+
+A national retail chain: 400 stores, one week of data.
 
 ```{r}
 glimpse(storemax)
 ```
 
-::: notes
-This dataset follows us all weekend. Every method we learn
-interrogates this same company.
-:::
-
-# A Little Theory (No Proofs) {background-color="#1a3a5c"}
-
-## The model
-
-$$\text{sales}_i = \beta_0 + \beta_1\,\text{ad\_spend}_i + \beta_2\,\text{price}_i + \varepsilon_i$$
-
-- The model describes the **conditional mean** of Y given the Xs
-- $\beta_k$: expected change in Y for a one-unit change in $X_k$,
-  **holding the other Xs constant**
-- "Holding constant" is the entire point of *multiple* regression
-
-## How the line is chosen: OLS
-
-- OLS picks the $\beta$s that minimize the sum of **squared residuals**
-- Residual = actual − predicted: what the model missed
-
-```{r}
-#| echo: false
-#| fig-height: 4
-ggplot(storemax, aes(ad_spend, sales)) +
-  geom_point(alpha = .3) +
-  geom_smooth(method = "lm", se = FALSE) +
-  labs(x = "Ad spend ($000/week)", y = "Weekly sales (units)")
-```
+| Variable | Meaning |
+|:--------------|:------------------------------------------|
+| `sales` | weekly units sold (**Y**) |
+| `ad_spend` | local ad spend, $000/week |
+| `price` | average price, $ |
+| `store_size` | 1,000 sq ft |
+| `region` | Southeast / Northeast / Midwest / West |
 
 ::: notes
-One intuitive picture; no derivation. "Best" has a precise meaning —
-we give it a name (BLUE) tomorrow.
+StoreMax follows us through both residency days. Keep
+market_affluence and price_tier out of the discussion today: they
+are tomorrow's surprises (Simpson's paradox, interactions).
 :::
 
-# Running It in R {background-color="#1a3a5c"}
-
-## `lm()`: one line
+## Your first multiple regression
 
 ```{r}
 m1 <- lm(sales ~ ad_spend + price + store_size, data = storemax)
 ```
 
-That's it. The work is in **reading** what comes back.
+- Formula: `outcome ~ predictor1 + predictor2 + ...`
+- One line to fit the model. The work is in **reading** what comes back
 
-## Anatomy of `summary()` — the whole output
+## The whole output
 
 ```{r}
 summary(m1)
 ```
 
 ::: notes
-Spend real time here. Walk every line on the next slides.
+Let them stare at it for 20 seconds. Then: "every number here has a job.
+By the end of this block you'll know each one, and how to pull it out."
+Point back to the output-notation key.
 :::
 
-## Anatomy, line by line
+## Anatomy: the coefficient table {.dense}
 
-| Piece | What it is | What it is **not** |
-|---|---|---|
-| `Estimate` | the fitted $\beta$ | a causal effect |
-| `Std. Error` | uncertainty in $\beta$ | the spread of Y |
-| `t value`, `Pr(>|t|)` | test of $\beta = 0$ | effect size |
-| `R-squared` | share of **variance** explained | share of sales explained |
-| `F-statistic` | all slopes = 0, jointly | model "correctness" |
+| Column | What it is | What it is **not** |
+|:--------------|:----------------------------------------|:-----------------------------------|
+| `Estimate` | $\hat\beta_j$, the fitted coefficient | a causal effect |
+| `Std. Error` | uncertainty in $\hat\beta_j$ (valid only if Promises 4–5 hold) | the spread of Y |
+| `t value` | Estimate ÷ Std. Error | an effect size |
+| `Pr(>|t|)` | p-value for $H_0: \beta_j = 0$ | the probability the effect is real |
 
-## Output → Sentence {.smaller}
+## Anatomy: the model-level lines {.dense}
+
+| Line | What it is | What it is **not** |
+|:--------------------|:----------------------------------------|:-----------------------------|
+| `Residual standard error` | typical size of a residual (in Y units); df = n − k − 1 | the SE of a coefficient |
+| `Multiple R-squared` | share of the **variance** in Y explained | share of sales explained |
+| `Adjusted R-squared` | R² penalized for the number of predictors | a significance test |
+| `F-statistic` | test that **all** slopes = 0 jointly | proof the model is correct |
+
+::: notes
+df: n − k − 1 = 400 − 3 − 1 = 396. Point to it in the output. This is
+why we use k for predictors and n for sample size.
+:::
+
+## Confidence intervals: a range for every estimate
+
+```{r}
+confint(m1)
+```
+
+- 95% CI ≈ Estimate ± 2 × Std. Error
+- Excludes 0 ⇔ p < .05 (same information, more useful format)
+- Reviewers increasingly prefer CIs to stars
+
+## Output → Sentence
 
 ```{r}
 #| echo: false
-tidy(m1) |> mutate(across(where(is.numeric), ~round(., 2)))
+tidy(m1, conf.int = TRUE) |>
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
 ```
 
-**What we can now say:**
-
 > "Holding price and store size constant, each additional $1,000 of weekly
-> ad spend is associated with roughly ___ additional units sold
-> (b = ___, p ___ )."
+> ad spend is associated with about `r round(coef(m1)["ad_spend"])`
+> additional units sold per week
+> (b = `r round(coef(m1)["ad_spend"], 1)`,
+> 95% CI [`r round(confint(m1)["ad_spend", 1], 1)`,
+> `r round(confint(m1)["ad_spend", 2], 1)`])."
 
-**Fill in the blanks. Every number in the table has a sentence.**
+**Every number in the table has a sentence.** Write the one for `store_size`.
+
+## Categorical predictors: dummy variables
+
+```{r}
+m2 <- lm(sales ~ ad_spend + price + store_size + region, data = storemax)
+tidy(m2) |> mutate(across(where(is.numeric), ~ round(.x, 1)))
+```
+
+- A factor with 4 levels → **3 dummies**; the first level (Southeast) is the **reference**
+- Each dummy coefficient = that region **vs. Southeast**, holding the other Xs constant
+
+## Output → Sentence: dummies
+
+> "Compared with Southeast stores (the reference), Northeast stores sell about
+> `r round(coef(m2)["regionNortheast"])` more units per week, holding ad spend,
+> price, and store size constant."
+
+Changing the reference changes the **comparisons**, not the model:
+
+```{r}
+m2b <- lm(sales ~ ad_spend + price + store_size +
+            relevel(region, ref = "West"), data = storemax)
+c(R2_original = summary(m2)$r.squared, R2_releveled = summary(m2b)$r.squared)
+```
+
+::: notes
+Same R², same fitted values, different rows in the table. Ask: "what does
+the Northeast coefficient mean now?" (Northeast vs. West.)
+:::
 
 ## Mis-interpretation check ❌
 
 Would a reviewer let these through?
 
-1. "Ad spend **drives** sales up by 100 units." 
-2. "The model **explains 60% of sales**."
+1. "Ad spend **drives** sales up by `r round(coef(m2)["ad_spend"])` units."
+2. "The model **explains `r round(100 * summary(m2)$r.squared)`% of sales**."
 3. "Price is not significant, so price **has no effect**."
+4. "Northeast has the **largest effect** because its coefficient is biggest."
+5. "p < .001, so the effect is **large**."
 
 ::: notes
-(1) causal verb from observational data; (2) variance ≠ level;
-(3) absence of evidence ≠ evidence of absence. Recurring segment —
-same game appears on quizzes.
+(1) causal verb from observational data (and Promise 3 is unverified);
+(2) variance, not level; (3) absence of evidence ≠ evidence of absence;
+(4) dummies are comparisons against the reference, not "effects" ranked
+by size; (5) significance ≠ magnitude. This game recurs all course, and
+quiz questions use the same format.
 :::
 
-# Categorical Predictors {background-color="#1a3a5c"}
+## Getting numbers out: three levels of output {.dense}
 
-## Dummy variables: region
+| Level | What | Base R | broom |
+|:------------|:--------------------------|:--------------------------------------------------|:-------------|
+| **Coefficient** | estimates, SEs, t, p, CIs | `coef()`, `summary(m)$coefficients`, `confint()` | `tidy()` |
+| **Model** | R², adj. R², F, σ, n | `summary(m)$r.squared`, `sigma()`, `nobs()` | `glance()` |
+| **Observation** | fitted values, residuals | `fitted()`, `residuals()` | `augment()` |
 
-```{r}
-m2 <- lm(sales ~ ad_spend + price + store_size + region,
-         data = storemax)
-tidy(m2) |> mutate(across(where(is.numeric), ~round(., 1)))
-```
+Why extract instead of copying? **Copy-pasting numbers into a manuscript invites
+errors; extracting them makes your analysis reproducible.**
 
-- R picks a **reference category** (first level: Southeast)
-- Each coefficient = that region **vs. the reference**, holding the rest constant
-
-## Output → Sentence
-
-> "Compared with Southeast stores (the reference), Northeast stores sell
-> about ___ more units per week, holding ad spend, price, and store
-> size constant."
-
-- Changing the reference changes the coefficients, **not the model**
-- `relevel()` demo: same fit, different comparisons
-
-## Standardized vs. unstandardized
+## Base R: what's inside the object
 
 ```{r}
-m2_std <- lm(scale(sales) ~ scale(ad_spend) + scale(price) +
-             scale(store_size) + region, data = storemax)
+s <- summary(m2)
+coef(m2)                              # estimates
+s$coefficients[, "Std. Error"]        # standard errors
+s$coefficients[, "Pr(>|t|)"]          # p-values
+c(R2 = s$r.squared, adjR2 = s$adj.r.squared, sigma = s$sigma)
+s$fstatistic                          # F, numerator df, denominator df
 ```
-
-- Unstandardized: real units → best for **substantive** sentences
-- Standardized: SD units → comparing **relative importance** within a model
-- Never compare standardized βs **across** different samples/models
-
-# Lab {background-color="#2c5f2d"}
-
-## Lab 1: Your turn with StoreMax
-
-1. Fit `sales ~ ad_spend + price + store_size + region`
-2. Produce the tidy coefficient table (`broom::tidy()`)
-3. **Deliverable: write the three sentences** this table supports —
-   one continuous predictor, one dummy, one about model fit
-4. Swap with a neighbor: would a reviewer let their sentences through?
 
 ::: notes
-Deliverable is prose, not output. ~40 min. Circulate; collect the two
-best and two most instructive wrong sentences for debrief.
+Optional: `str(s)` to show the full list structure. It demystifies the
+object; students see summary() is just a list of named pieces.
 :::
 
-# Reading the Literature {background-color="#1a3a5c"}
+## broom: the modern way
 
-## Interpretation audit: a published table
+```{r}
+tidy(m2, conf.int = TRUE)   # one row per coefficient
+glance(m2)                  # one row per model
+augment(m2) |> head(3)      # one row per observation
+```
 
-- [Insert Table from your chosen JMR/JM paper]
-- Text covered: **you write the sentences** the table supports
-- Then: reveal what the authors wrote — compare
+- Each returns a **data frame**, ready to filter, round, and export
+
+## Verify the table: every number comes from others
+
+```{r}
+est <- coef(m2)["ad_spend"]
+se  <- s$coefficients["ad_spend", "Std. Error"]
+df  <- df.residual(m2)                      # n - k - 1
+
+t_hand  <- est / se
+p_hand  <- 2 * pt(-abs(t_hand), df)
+ci_hand <- est + c(-1, 1) * qt(.975, df) * se
+
+r2_hand <- 1 - sum(residuals(m2)^2) /
+               sum((storemax$sales - mean(storemax$sales))^2)
+
+c(t = t_hand, p = p_hand, ci_low = ci_hand[1], ci_high = ci_hand[2], R2 = r2_hand)
+```
+
+Compare with `summary(m2)`: identical.
 
 ::: notes
-Pick a paper whose Table has a continuous predictor, a dummy, and R².
-The audit format beats "here's how they used it."
+The payoff for the paper-based quizzes: if you know how the numbers
+relate, you can spot a table that doesn't add up (e.g., an estimate and SE
+whose ratio doesn't match the reported t).
+:::
+
+## Try it (≈10 min)
+
+Using `m2`:
+
+1. Extract the p-value for `price` **two ways** (base R and broom)
+2. Extract adjusted R² and the residual standard error
+3. Recompute the 95% CI for `store_size` by hand and check it against `confint()`
+4. Write **one sentence** each for `store_size` and `regionWest`
+
+# Block 4 — Holding Constant, Partial Correlations, Standardization {background-color="#1a3a5c"}
+
+## What does "holding constant" actually mean?
+
+A coefficient in multiple regression is the slope of Y on X **after removing
+from both what the other predictors explain**:
+
+```{r}
+# Step 1: strip from sales what the other Xs explain
+r_y <- residuals(lm(sales ~ price + store_size + region, data = storemax))
+# Step 2: strip from ad_spend what the other Xs explain
+r_x <- residuals(lm(ad_spend ~ price + store_size + region, data = storemax))
+# Step 3: regress leftover on leftover
+c(residual_slope = unname(coef(lm(r_y ~ r_x))[2]),
+  multiple_reg   = unname(coef(m2)["ad_spend"]))
+```
+
+Same number. **That is what "holding constant" means.**
+
+## Seeing it: the added-variable plot
+
+```{r}
+#| fig-height: 4
+ggplot(tibble(r_x, r_y), aes(r_x, r_y)) +
+  geom_point(alpha = .3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Ad spend, net of other predictors",
+       y = "Sales, net of other predictors")
+```
+
+- The slope of this line = the `ad_spend` coefficient in `m2`
+- `car::avPlots()` draws these for every predictor at once
+
+## Partial vs. semi-partial correlation
+
+| | Remove other Xs from… | Answers |
+|:----------------------|:-------------------|:-------------------------------------------------------|
+| **Partial r** | both X and Y | "How strongly are X and Y related, net of everything else?" |
+| **Semi-partial (part) r** | X only | "How much does X **uniquely** add to explaining Y?" |
+
+```{r}
+partial_r     <- cor(r_y, r_x)
+semipartial_r <- cor(storemax$sales, r_x)
+c(partial = partial_r, semipartial = semipartial_r)
+```
+
+## Semi-partial² = unique contribution = ΔR²
+
+```{r}
+m_without <- lm(sales ~ price + store_size + region, data = storemax)
+c(semipartial_sq = semipartial_r^2,
+  delta_R2       = summary(m2)$r.squared - summary(m_without)$r.squared)
+```
+
+- The squared semi-partial = the R² **gained by adding ad spend last**
+- Tomorrow this becomes the core tool for **nested model comparison**
+
+::: notes
+Optional aside: partial r² = t² / (t² + df). Another "every number comes
+from others" moment.
+:::
+
+## Which predictor matters most? The units problem
+
+- `ad_spend` is in $000s, `price` in dollars, `store_size` in 1,000 sq ft
+- Raw coefficients **cannot be compared** across predictors: a "unit" means different things
+- Common fix in the literature: **standardize** (convert to z-scores: mean 0, SD 1)
+
+## Three ways to scale a regression
+
+| Version | Coefficient means… |
+|:-----------------------------------|:-----------------------------------------------------------|
+| **Raw X, raw Y** | change in Y units per **one-unit** change in X |
+| **Standardized X only** | change in Y units per **one-SD** change in X |
+| **Standardized X and Y** ("beta weights") | change in **SDs of Y** per **one-SD** change in X |
+
+- In simple regression, the fully standardized slope **equals r**
+- "X only" is often the most readable for business audiences: Y stays in real units
+
+## Standardizing in R
+
+```{r}
+storemax_z <- storemax |>
+  mutate(across(c(ad_spend, price, store_size),
+                ~ as.numeric(scale(.x)), .names = "{.col}_z"),
+         sales_z = as.numeric(scale(sales)))
+
+m_raw <- lm(sales   ~ ad_spend   + price   + store_size   + region, data = storemax_z)
+m_xz  <- lm(sales   ~ ad_spend_z + price_z + store_size_z + region, data = storemax_z)
+m_bz  <- lm(sales_z ~ ad_spend_z + price_z + store_size_z + region, data = storemax_z)
+```
+
+- Note: `region` dummies are **left as 0/1**. Never standardize a dummy
+
+## Side by side: what changes, what doesn't {.dense}
+
+```{r}
+#| echo: false
+bind_rows(`Raw` = tidy(m_raw), `X std` = tidy(m_xz), `X & Y std` = tidy(m_bz),
+          .id = "version") |>
+  mutate(term = str_remove(term, "_z"),
+         version = factor(version, levels = c("Raw", "X std", "X & Y std"))) |>
+  select(version, term, estimate, statistic) |>
+  pivot_wider(names_from = version, values_from = c(estimate, statistic)) |>
+  mutate(across(where(is.numeric), ~ round(.x, 2)))
+```
+
+```{r}
+#| echo: false
+map_dfr(list(Raw = m_raw, `X std` = m_xz, `X & Y std` = m_bz), glance, .id = "version") |>
+  select(version, r.squared, adj.r.squared) |>
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+```
+
+::: notes
+Point to the `statistic_` columns: slope t-values are identical across all
+three. R² identical. Only the estimates (units) and the intercept change.
+:::
+
+## Output → Sentence: three versions, one finding
+
+- **Raw:** "Each additional $1,000 in ad spend is associated with
+  `r round(coef(m_raw)["ad_spend"])` more units per week."
+- **X standardized:** "A one-SD increase in ad spend is associated with
+  `r round(coef(m_xz)["ad_spend_z"])` more units per week."
+- **X & Y standardized:** "A one-SD increase in ad spend is associated with a
+  `r round(coef(m_bz)["ad_spend_z"], 2)`-SD increase in weekly sales."
+
+All three, holding price, store size, and region constant.
+
+## ⚠️ Standardization: read before you interpret
+
+- **Same evidence, new units.** Rescaling changes how coefficients read, not what
+  the data say: slope t-values, p-values, and R² are identical. (The intercept's
+  test changes because its meaning changes.)
+- **The intercept changes meaning.** With centered X, it's the predicted Y at the
+  average X. With X and Y both standardized, it's zero (for continuous predictors).
+- **Never standardize a dummy variable.** "A one-SD change in being in the Northeast"
+  is meaningless. Interpret dummies in 0/1 form even when everything else is standardized.
+- **Be careful with "relative importance."** Comparing beta weights *within* a model is
+  shaky when predictors are correlated. Comparing them *across* samples or models is invalid.
+- **Check the table note.** In many published tables, "β" = standardized, "b"/"B" = unstandardized.
+
+## Try it (≈15 min)
+
+1. Using `m_xz`, write the sentence for `store_size_z`
+2. Using `m_bz`, which continuous predictor has the largest beta weight?
+   Name one reason to be cautious about calling it "most important"
+3. Compute the semi-partial r² for `store_size` (hint: drop it, compare R²)
+4. Standardize **only** `price` and refit. Which numbers in the output changed,
+   and which stayed the same?
+
+::: notes
+Block 4 has a little more room now (prediction and logs moved to
+tomorrow), so this exercise can run the full 15 minutes.
 :::
 
 ## Looking ahead to tomorrow
 
-- Today we **ran and read** the model
-- Tomorrow we ask: **can we trust it?**
-  - The assumptions behind the output (Gauss-Markov)
-  - Diagnostics in R, and repairs
-  - Building and comparing models; interactions
-  - And a puzzle: what happens to the price coefficient when we add
-    one more variable…
+- **Checking the promises:** diagnostics in R, and repairs (including **logs**,
+  and elasticities)
+- **Building and comparing models:** nested models, ΔR², AIC/BIC
+- **Predicting new data:** `predict()`, prediction intervals, train/test split
+- **Interactions:** when the effect of X depends on another variable
+- **A puzzle:** what happens to the price coefficient when we add one more variable...
+- **Difference-in-differences:** a famous interaction, and a causal claim
 
 ::: notes
-The cliffhanger is Simpson's: price looks ~flat until
-market_affluence enters, then turns sharply negative. Don't spoil it.
+Cliffhanger: price looks positive today. Tomorrow, adding
+market_affluence flips it negative (Simpson's paradox). Don't spoil it.
+Quiz 1 tomorrow morning covers today's material: notation, the five
+promises and what each violation does, reading and extracting output,
+dummies, holding constant / partial correlations, and standardization.
 :::

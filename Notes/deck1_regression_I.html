@@ -9,7 +9,7 @@
 <link href="deck1_regression_I_files/libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
   <meta name="generator" content="quarto-1.10.18">
 
-  <meta name="author" content="Tek Song">
+  <meta name="author" content="Your Name">
   <title>Multiple Regression I: The Linear Model</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -101,7 +101,7 @@
     code span.vs { color: #20794d; } /* VerbatimString */
     code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
   </style>
-  <link rel="stylesheet" href="deck1_regression_I_files/libs/revealjs/dist/theme/quarto-2740581606dc327e82f18f789b69d8a0.css">
+  <link rel="stylesheet" href="deck1_regression_I_files/libs/revealjs/dist/theme/quarto-ef17a795e348b03432308a1d836fa542.css">
   <link href="deck1_regression_I_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
   <link href="deck1_regression_I_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
   <link href="deck1_regression_I_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
@@ -117,6 +117,7 @@
     }
     .reveal .slide:not(.center) {
       height: 100%;
+      overflow-y: auto;
     }
     .reveal .slide.scrollable {
       overflow-y: auto;
@@ -193,38 +194,64 @@
       margin-right: 0; 
     }
   </style>
+  <script src="deck1_regression_I_files/libs/quarto-diagram/mermaid.min.js"></script>
+  <script src="deck1_regression_I_files/libs/quarto-diagram/mermaid-init.js"></script>
+  <link href="deck1_regression_I_files/libs/quarto-diagram/mermaid.css" rel="stylesheet">
 </head>
 <body class="quarto-light">
   <div class="reveal">
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Multiple Regression I: The Linear Model</h1>
-  <p class="subtitle">MAR 7628 — Quantitative Data Analysis | Residency 1, Day 1</p>
+  <h1 class="title">Multiple Regression I:<br>The Linear Model</h1>
+  <p class="subtitle">MAR 7628 — Quantitative Data Analysis<br>Residency 1, Day 1 (Fri, Jan 22)</p>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
 <div class="quarto-title-author-name">
-Tek Song
+Your Name
 </div>
 </div>
 </div>
 
 </section>
-<section>
-<section id="why-regression" class="title-slide slide level1 center" data-background-color="#1a3a5c">
-<h1>Why Regression?</h1>
-
-</section>
-<section id="the-workhorse-of-business-research" class="slide level2">
-<h2>The workhorse of business research</h2>
+<section id="learning-agenda" class="slide level2">
+<h2>Learning agenda</h2>
 <ul>
-<li>Open any issue of <em>JMR</em>, <em>Marketing Science</em>, or <em>JM</em>: the headline evidence is very often a <strong>regression table</strong></li>
-<li>Research questions of the form: <em>“How is Y related to X, holding everything else constant?”</em></li>
-<li>Today: <strong>run it and read it</strong>. Tomorrow: interrogate it.</li>
+<li><strong>Foundations:</strong> the model and its notation</li>
+<li><strong>The model’s promises:</strong> the assumptions behind every regression</li>
+<li><strong>Reading and extracting</strong> the output table</li>
+<li><strong>What “holding constant” means:</strong> partial correlations and standardization</li>
 </ul>
 <aside class="notes">
-<p>Show 2–3 journal abstracts/tables here (screenshots). Pick your own go-to papers; read one DV + one coefficient aloud.</p>
+<p>Four 50-minute blocks, 10-minute break after each; ~30 min slack. Block 3 is the fullest (extraction exercise). Spend the slack there first. Prediction and logs are covered tomorrow (Deck 2).</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section>
+<section id="block-1-foundations" class="title-slide slide level1 center" data-background-color="#1a3a5c">
+<h1>Block 1 — Foundations</h1>
+
+</section>
+<section id="why-regression" class="slide level2">
+<h2>Why regression?</h2>
+<ul>
+<li>Open any issue of <em>JMR</em>, <em>Marketing Science</em>, <em>JM</em>, or <em>JCR</em>: much of the headline evidence is a <strong>regression table</strong></li>
+<li>Research questions of the form: <em>“How is Y related to X, holding everything else constant?”</em></li>
+<li>Today: <strong>the model, what it assumes, and how to read it</strong></li>
+<li>Tomorrow: check the assumptions, build and compare models</li>
+</ul>
+<aside class="notes">
+<p>[INSERT 1–2 journal table screenshots here: your chosen papers.] Read one DV and one coefficient aloud. Don’t explain yet: “by 5 pm today you’ll read this table fluently.”</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -240,17 +267,509 @@ Tek Song
 <section id="when-to-use-multiple-regression" class="slide level2">
 <h2>When to use multiple regression</h2>
 <ul>
-<li><strong>Outcome (Y):</strong> one continuous variable</li>
-<li><strong>Predictors (X):</strong> any mix — continuous, categorical, many of them</li>
-<li><strong>Question:</strong> association between each X and Y, <em>adjusting for the others</em></li>
-<li>Not (yet) a causal claim — that conversation is tomorrow</li>
+<li><strong>Outcome (Y):</strong> one continuous variable (sales, satisfaction, spend)</li>
+<li><strong>Predictors (X):</strong> any mix of continuous and categorical</li>
+<li><strong>Question:</strong> the association between each X and Y, <em>adjusting for the others</em></li>
+<li><strong>Not (yet) a causal claim.</strong> We come back to this tomorrow</li>
 </ul>
 </section>
-<section id="meet-storemax-our-running-example" class="slide level2">
-<h2>Meet StoreMax (our running example)</h2>
-<p>A national retail chain, 400 stores, one week of data:</p>
+<section id="the-family-map-one-model-many-outfits" class="slide level2">
+<h2>The family map: one model, many outfits</h2>
+<div class="cell" data-reveal="true" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart TD
+  LM["&lt;b&gt;Linear model&lt;/b&gt;&lt;br/&gt;y = α + βx + ε"]
+  T["t-test&lt;br/&gt;(one binary X)"]
+  AN["ANOVA&lt;br/&gt;(categorical Xs only)"]
+  ANC["ANCOVA&lt;br/&gt;(categorical + continuous X)"]
+  LOG["Logistic regression&lt;br/&gt;(binary Y, logit link)"]
+  RL["Ridge / lasso&lt;br/&gt;(same model + penalty)"]
+  PCA["PCA / EFA&lt;br/&gt;(no Y — a different family)"]
+  T --&gt; LM
+  LM --&gt; AN
+  AN --&gt; ANC
+  LM --&gt; LOG
+  LM --&gt; RL
+  LM -.-&gt; PCA
+  style LM fill:#f4a261,stroke:#333,stroke-width:2px
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>This map returns at the start of every topic, with the current method highlighted. PCA/EFA sit outside on purpose: no outcome variable, so they leave the regression family. Saying so gives “everything is regression” an honest boundary.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="youve-already-run-a-regression" class="slide level2">
+<h2>You’ve already run a regression</h2>
+<p>Two-group t-test (equal variances) vs.&nbsp;<code>lm()</code> with one dummy:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="" aria-label="1"></a><span class="fu">glimpse</span>(storemax)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="" aria-hidden="true" tabindex="-1"></a>two <span class="ot">&lt;-</span> storemax <span class="sc">|&gt;</span></span>
+<span id="cb1-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(region <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Southeast"</span>, <span class="st">"Northeast"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb1-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">droplevels</span>()</span>
+<span id="cb1-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="" aria-hidden="true" tabindex="-1"></a>tt  <span class="ot">&lt;-</span> <span class="fu">t.test</span>(sales <span class="sc">~</span> region, <span class="at">data =</span> two, <span class="at">var.equal =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb1-6"><a href="" aria-hidden="true" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales <span class="sc">~</span> region, <span class="at">data =</span> two)</span>
+<span id="cb1-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">t_test_t  =</span> <span class="fu">unname</span>(tt<span class="sc">$</span>statistic),</span>
+<span id="cb1-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="at">lm_t      =</span> <span class="fu">summary</span>(fit)<span class="sc">$</span>coefficients[<span class="st">"regionNortheast"</span>, <span class="st">"t value"</span>],</span>
+<span id="cb1-10"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="at">lm_F      =</span> <span class="fu">unname</span>(<span class="fu">summary</span>(fit)<span class="sc">$</span>fstatistic[<span class="st">"value"</span>]),</span>
+<span id="cb1-11"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="at">t_squared =</span> <span class="fu">unname</span>(tt<span class="sc">$</span>statistic)<span class="sc">^</span><span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> t_test_t      lm_t      lm_F t_squared 
+-6.410794  6.410794 41.098277 41.098277 </code></pre>
+</div>
+</div>
+<ul>
+<li>Same |t|, same p-value, and <strong>t² = F</strong></li>
+<li>(The sign of t can flip: it depends only on which group is subtracted from which)</li>
+</ul>
+</section>
+<section id="the-model" class="slide level2">
+<h2>The model</h2>
+<p><span class="math display">\[y_i = \alpha + \beta_1 x_{1i} + \beta_2 x_{2i} + \cdots + \beta_k x_{ki} + \varepsilon_i\]</span></p>
+<ul>
+<li>One equation that holds <strong>for each observation</strong> <span class="math inline">\(i = 1, \dots, n\)</span> (each store)</li>
+<li><span class="math inline">\(\beta_j\)</span>: expected change in <span class="math inline">\(y\)</span> for a one-unit change in <span class="math inline">\(x_j\)</span>, <strong>holding the other <span class="math inline">\(x\)</span>s constant</strong></li>
+<li><span class="math inline">\(\varepsilon_i\)</span>: everything about store <span class="math inline">\(i\)</span> the <span class="math inline">\(x\)</span>s don’t capture</li>
+</ul>
+</section>
+<section id="how-the-line-is-chosen-ols" class="slide level2">
+<h2>How the line is chosen: OLS</h2>
+<ul>
+<li><strong>Ordinary Least Squares:</strong> choose the intercept and slopes that make the <strong>sum of squared residuals</strong> as small as possible</li>
+<li>Residual = actual − predicted: what the model missed</li>
+</ul>
+
+<img data-src="deck1_regression_I_files/figure-revealjs/unnamed-chunk-3-1.png" width="960" class="r-stretch"><aside class="notes">
+<p>No normal equations, no proof. In Block 2 we name why OLS is “best” (BLUE) and under which conditions.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="notation-the-textbook" class="slide level2 dense">
+<h2>Notation: the textbook</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 87%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Symbol</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(n\)</span></td>
+<td style="text-align: left;">sample size (number of observations)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(k\)</span></td>
+<td style="text-align: left;">number of predictors</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(i\)</span></td>
+<td style="text-align: left;">observation index (store <span class="math inline">\(i\)</span>)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(\alpha\)</span></td>
+<td style="text-align: left;">intercept</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(\beta_j\)</span></td>
+<td style="text-align: left;"><strong>population</strong> coefficient for predictor <span class="math inline">\(j\)</span>: unknown</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(\hat\beta_j\)</span></td>
+<td style="text-align: left;"><strong>estimate</strong> of <span class="math inline">\(\beta_j\)</span> from our sample</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(\varepsilon_i\)</span></td>
+<td style="text-align: left;"><strong>error</strong>: unobservable</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(\hat y_i\)</span></td>
+<td style="text-align: left;"><strong>fitted (predicted)</strong> value for observation <span class="math inline">\(i\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(e_i = y_i - \hat y_i\)</span></td>
+<td style="text-align: left;"><strong>residual</strong>: computable</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Fitted model (no error term; it’s a prediction):</strong></p>
+<p><span class="math display">\[\hat y_i = \hat\alpha + \hat\beta_1 x_{1i} + \cdots + \hat\beta_k x_{ki}\]</span></p>
+<aside class="notes">
+<p>The hat is the core idea: no hat = the truth we want; hat = what our data give us. ε vs.&nbsp;e matters in Block 2: assumptions are about ε, but we can only check them using e, so diagnostics are always indirect. Mention β₀ as the alternative intercept notation verbally.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="notation-youll-see-in-papers" class="slide level2">
+<h2>Notation you’ll see in papers</h2>
+<p>Recognize these; you don’t need to use them:</p>
+<ul>
+<li><strong>Matrix form:</strong> <span class="math inline">\(\mathbf{y} = \mathbf{X}\boldsymbol\beta + \boldsymbol\varepsilon\)</span>, the same model written compactly</li>
+<li><strong><span class="math inline">\(b\)</span> vs.&nbsp;<span class="math inline">\(\hat\beta\)</span>:</strong> both mean “the estimated coefficient”</li>
+<li><strong>⚠️ In many APA-style tables, “β” means the <em>standardized</em> coefficient</strong> and “b” or “B” the unstandardized one. This clashes with the textbook use of β as the population value. Always check the table note.</li>
+<li><strong><span class="math inline">\(y_{it}\)</span>:</strong> observation <span class="math inline">\(i\)</span> at time <span class="math inline">\(t\)</span> (panel data); <strong><span class="math inline">\(y_{ij}\)</span>:</strong> person <span class="math inline">\(i\)</span> in firm <span class="math inline">\(j\)</span></li>
+</ul>
+</section></section>
+<section>
+<section id="block-2-the-models-promises" class="title-slide slide level1 center" data-background-color="#1a3a5c">
+<h1>Block 2 — The Model’s Promises</h1>
+
+</section>
+<section id="why-assumptions-before-any-output" class="slide level2">
+<h2>Why assumptions, before any output?</h2>
+<ul>
+<li>Soon we’ll read standard errors, t-values, p-values, and confidence intervals</li>
+<li>Every one of those numbers is valid <strong>only if the model’s promises hold</strong></li>
+<li>So first: <strong>what does the model promise, about each of its parts?</strong></li>
+<li>Today: understand the promises. <strong>Tomorrow: check them in R</strong></li>
+</ul>
+</section>
+<section id="the-equation-has-three-parts" class="slide level2">
+<h2>The equation has three parts</h2>
+<p><span class="math display">\[y_i = \underbrace{\alpha + \beta_1 x_{1i} + \cdots + \beta_k x_{ki}}_{\text{systematic part}}
+\;+\; \underbrace{\varepsilon_i}_{\text{error}}\]</span></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 66%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Part of the equation</th>
+<th style="text-align: left;">Promise</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Systematic part</strong></td>
+<td style="text-align: left;"><strong>1. Linearity / correct specification</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>The <span class="math inline">\(x\)</span>’s</strong></td>
+<td style="text-align: left;"><strong>2. No perfect collinearity</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>The error <span class="math inline">\(\varepsilon_i\)</span></strong></td>
+<td style="text-align: left;"><strong>3. Exogeneity</strong> · <strong>4. Homoscedasticity</strong> · <strong>5. Independence</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><em>(optional extra)</em></td>
+<td style="text-align: left;"><em>Normality of the errors: outside Gauss-Markov</em></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="promise-1-linearity-correct-specification" class="slide level2">
+<h2>Promise 1: Linearity / correct specification</h2>
+<p><strong>The promise (systematic part):</strong> <span class="math inline">\(y\)</span> really is <span class="math inline">\(\alpha + \beta_1 x_1 + \cdots + \beta_k x_k\)</span> on average: the right <strong>form</strong> and the right <strong>variables</strong>.</p>
+<ul>
+<li><strong>Plain English:</strong> a straight-line relationship for each <span class="math inline">\(x\)</span> (holding the others constant), and nothing important left out or wrongly put in</li>
+<li><strong>StoreMax example:</strong> ad spend may have <strong>diminishing returns</strong>: the first $5k of ads helps far more than the next $5k. A straight line would misdescribe that.</li>
+<li><strong>If violated:</strong> <strong>biased coefficients</strong>. The story itself is wrong.</li>
+<li><strong>Tomorrow:</strong> residual plots, component-plus-residual plots; remedies such as logs</li>
+</ul>
+</section>
+<section id="promise-2-no-perfect-collinearity" class="slide level2">
+<h2>Promise 2: No perfect collinearity</h2>
+<p><strong>The promise (the <span class="math inline">\(x\)</span>’s):</strong> no predictor is an <strong>exact</strong> linear combination of the others.</p>
+<ul>
+<li><strong>Plain English:</strong> each <span class="math inline">\(x\)</span> must carry some information the others don’t</li>
+<li><strong>StoreMax example:</strong> including store size in <strong>sq ft <em>and</em> sq meters</strong>. They are the same variable, so R can’t separate them (it drops one: <code>NA</code> in the output).</li>
+<li><strong>Near</strong>-collinearity is the practical problem: ad spend and store size move together, so their separate effects are hard to pin down</li>
+<li><strong>If violated:</strong> perfect → can’t estimate; near → <strong>unstable estimates, inflated SEs</strong></li>
+<li><strong>Tomorrow:</strong> variance inflation factors (VIF)</li>
+</ul>
+</section>
+<section id="promise-3-exogeneity" class="slide level2">
+<h2>Promise 3: Exogeneity</h2>
+<p><strong>The promise (the error):</strong> <span class="math inline">\(E[\varepsilon_i \mid X] = 0\)</span>. The error is <strong>unrelated to the <span class="math inline">\(x\)</span>’s</strong>.</p>
+<ul>
+<li><strong>Plain English:</strong> whatever we left out of the model is not systematically tied to the predictors we included</li>
+<li><strong>StoreMax examples:</strong>
+<ul>
+<li><em>Omitted variable:</em> local competition lowers both prices and sales, and it’s not in the model</li>
+<li><em>Reverse causality:</em> head office sends <strong>more ad budget to struggling stores</strong>, so low sales cause high ad spend, not the other way round</li>
+</ul></li>
+<li><strong>If violated:</strong> <strong>biased coefficients</strong> (the endogeneity problem)</li>
+<li><strong>Tomorrow:</strong> this one is <strong>not testable from residuals</strong>. It is argued from theory and research design.</li>
+</ul>
+<aside class="notes">
+<p>This is the assumption reviewers ask about most (“what about endogeneity?”). Keep market_affluence out of the examples: it’s tomorrow’s Simpson’s-paradox surprise.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="promise-4-homoscedasticity" class="slide level2">
+<h2>Promise 4: Homoscedasticity</h2>
+<p><strong>The promise (the error):</strong> <span class="math inline">\(Var(\varepsilon_i) = \sigma^2\)</span>, <strong>the same for every observation</strong>.</p>
+<ul>
+<li><strong>Plain English:</strong> the model’s misses are about equally large everywhere</li>
+<li><strong>StoreMax example:</strong> big stores’ weekly sales swing much more than small stores’. The spread of the errors grows with store size.</li>
+<li><strong>If violated:</strong> coefficients are fine, but <strong>standard errors are wrong</strong>, so p-values and CIs can’t be trusted</li>
+<li><strong>Tomorrow:</strong> scale-location plot, Breusch-Pagan test; remedy: robust standard errors</li>
+</ul>
+</section>
+<section id="promise-5-independence" class="slide level2">
+<h2>Promise 5: Independence</h2>
+<p><strong>The promise (the error):</strong> <span class="math inline">\(\varepsilon_i\)</span> is unrelated to <span class="math inline">\(\varepsilon_j\)</span> for different observations.</p>
+<ul>
+<li><strong>Plain English:</strong> one observation’s miss tells us nothing about another’s</li>
+<li><strong>StoreMax examples:</strong>
+<ul>
+<li>Stores in the <strong>same city</strong> share local shocks (a storm, a festival)</li>
+<li>The <strong>same store measured every week</strong> is not 52 independent observations</li>
+</ul></li>
+<li><strong>If violated:</strong> coefficients are fine, but <strong>standard errors are too small</strong>: false confidence</li>
+<li><strong>Tomorrow:</strong> mostly a <strong>design question</strong>: how was the data collected? Remedy: clustered standard errors</li>
+</ul>
+</section>
+<section id="and-normality" class="slide level2">
+<h2>And normality?</h2>
+<p><strong>Not a Gauss-Markov assumption.</strong> An optional extra: <span class="math inline">\(\varepsilon_i \sim N(0, \sigma^2)\)</span>.</p>
+<ul>
+<li>Matters only for <strong>exact inference in small samples</strong></li>
+<li>With reasonable <span class="math inline">\(n\)</span>, the central limit theorem does the heavy lifting</li>
+<li><strong>Common misconception:</strong> “the data must be normal.” No: it’s the <strong>errors</strong>, and even then only sort of</li>
+<li><strong>Tomorrow:</strong> Q-Q plots (preferred over formal normality tests)</li>
+</ul>
+</section>
+<section id="the-payoff-gauss-markov" class="slide level2">
+<h2>The payoff: Gauss-Markov</h2>
+<p>If Promises 1–5 hold, OLS is the</p>
+<p><strong>B</strong>est <strong>L</strong>inear <strong>U</strong>nbiased <strong>E</strong>stimator (<strong>BLUE</strong>)</p>
+<ul>
+<li><strong>Unbiased:</strong> on average, <span class="math inline">\(\hat\beta_j\)</span> hits the true <span class="math inline">\(\beta_j\)</span></li>
+<li><strong>Best:</strong> no other linear unbiased estimator has smaller variance</li>
+<li>No proof needed: this is the reason OLS is the default</li>
+</ul>
+</section>
+<section id="two-kinds-of-failure" class="slide level2">
+<h2>Two kinds of failure</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Violations that <strong>bias coefficients</strong></th>
+<th style="text-align: left;">Violations that <strong>corrupt standard errors</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Misspecification (1), endogeneity (3)</td>
+<td style="text-align: left;">Heteroscedasticity (4), dependence (5)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Your <strong>story</strong> is wrong</td>
+<td style="text-align: left;">Your story may be right, but your <strong>certainty</strong> is overstated</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Hard to fix: needs theory and design</td>
+<td style="text-align: left;">Often patchable (robust / clustered SEs)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The first column is fatal; the second is fixable.</strong></p>
+<aside class="notes">
+<p>Collinearity (2) sits apart: it doesn’t bias anything, it just makes estimates imprecise. Mention it verbally.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="promises-are-about-ε-we-only-see-e" class="slide level2">
+<h2>Promises are about ε; we only see e</h2>
+<ul>
+<li>The promises concern the <strong>errors</strong> <span class="math inline">\(\varepsilon_i\)</span>, which we never observe</li>
+<li>We check them indirectly, using the <strong>residuals</strong> <span class="math inline">\(e_i = y_i - \hat y_i\)</span></li>
+<li>Some can’t be checked from residuals at all: <strong>exogeneity is argued, not tested</strong></li>
+<li>Keep the five promises in mind as we read the output next: <strong>every SE and p-value we see leans on them</strong></li>
+</ul>
+</section></section>
+<section>
+<section id="block-3-reading-the-output" class="title-slide slide level1 center" data-background-color="#1a3a5c">
+<h1>Block 3 — Reading the Output</h1>
+
+</section>
+<section id="notation-rs-formula" class="slide level2">
+<h2>Notation: R’s formula</h2>
+<p>The model</p>
+<p><span class="math display">\[y_i = \alpha + \beta_1 x_{1i} + \beta_2 x_{2i} + \varepsilon_i\]</span></p>
+<p>is written in R as</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">lm</span>(y <span class="sc">~</span> x1 <span class="sc">+</span> x2, <span class="at">data =</span> mydata)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 76%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">In R</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>~</code></td>
+<td style="text-align: left;">“is modeled by”: outcome on the left, predictors on the right</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>+</code></td>
+<td style="text-align: left;">add a predictor</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><em>(nothing)</em></td>
+<td style="text-align: left;">the intercept <span class="math inline">\(\alpha\)</span> is included <strong>automatically</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><em>(nothing)</em></td>
+<td style="text-align: left;">the error <span class="math inline">\(\varepsilon_i\)</span> is <strong>never written</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>factor(x)</code></td>
+<td style="text-align: left;">treat <code>x</code> as categorical (creates dummies)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>I(x^2)</code></td>
+<td style="text-align: left;">do arithmetic inside the formula</td>
+</tr>
+</tbody>
+</table>
+<aside class="notes">
+<p>Interaction operators (<code>:</code> and <code>*</code>) and log transformations come tomorrow.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="notation-rs-output" class="slide level2 dense">
+<h2>Notation: R’s output</h2>
+<p>How the labels in <code>summary()</code> map onto the textbook symbols:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 18%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">In R output</th>
+<th style="text-align: left;">Symbol</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>(Intercept)</code></td>
+<td style="text-align: left;"><span class="math inline">\(\hat\alpha\)</span></td>
+<td style="text-align: left;">estimated intercept</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>Estimate</code></td>
+<td style="text-align: left;"><span class="math inline">\(\hat\beta_j\)</span></td>
+<td style="text-align: left;">estimated coefficient</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>Std. Error</code></td>
+<td style="text-align: left;"><span class="math inline">\(SE(\hat\beta_j)\)</span></td>
+<td style="text-align: left;">uncertainty in the estimate</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>t value</code></td>
+<td style="text-align: left;"><span class="math inline">\(\hat\beta_j / SE(\hat\beta_j)\)</span></td>
+<td style="text-align: left;">test statistic for <span class="math inline">\(\beta_j = 0\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>fitted(m)</code></td>
+<td style="text-align: left;"><span class="math inline">\(\hat y_i\)</span></td>
+<td style="text-align: left;">fitted (predicted) values</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>residuals(m)</code></td>
+<td style="text-align: left;"><span class="math inline">\(e_i\)</span></td>
+<td style="text-align: left;">residuals</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>Residual standard error</code></td>
+<td style="text-align: left;"><span class="math inline">\(\hat\sigma\)</span></td>
+<td style="text-align: left;">estimated SD of the errors</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>degrees of freedom</code></td>
+<td style="text-align: left;"><span class="math inline">\(n - k - 1\)</span></td>
+<td style="text-align: left;">residual df</td>
+</tr>
+</tbody>
+</table>
+<p><strong>This is your key for reading <code>summary()</code>.</strong></p>
+</section>
+<section id="meet-storemax" class="slide level2 dense">
+<h2>Meet StoreMax</h2>
+<p>A national retail chain: 400 stores, one week of data.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(storemax)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Rows: 400
 Columns: 8
@@ -264,8 +783,38 @@ $ store_size       &lt;dbl&gt; 38.6, 21.3, 46.4, 47.7, 57.3, 13.2, 30.2, 17.0, 1
 $ market_affluence &lt;dbl&gt; -1.28852063, 1.19390737, 0.39107030, 0.02648378, -0.6…</code></pre>
 </div>
 </div>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Variable</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>sales</code></td>
+<td style="text-align: left;">weekly units sold (<strong>Y</strong>)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>ad_spend</code></td>
+<td style="text-align: left;">local ad spend, $000/week</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>price</code></td>
+<td style="text-align: left;">average price, $</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>store_size</code></td>
+<td style="text-align: left;">1,000 sq ft</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>region</code></td>
+<td style="text-align: left;">Southeast / Northeast / Midwest / West</td>
+</tr>
+</tbody>
+</table>
 <aside class="notes">
-<p>This dataset follows us all weekend. Every method we learn interrogates this same company.</p>
+<p>StoreMax follows us through both residency days. Keep market_affluence and price_tier out of the discussion today: they are tomorrow’s surprises (Simpson’s paradox, interactions).</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -277,58 +826,21 @@ $ market_affluence &lt;dbl&gt; -1.28852063, 1.19390737, 0.39107030, 0.02648378, 
           overflow: hidden!important;
           display:block!important;
       }</style></aside>
-</section></section>
-<section>
-<section id="a-little-theory-no-proofs" class="title-slide slide level1 center" data-background-color="#1a3a5c">
-<h1>A Little Theory (No Proofs)</h1>
-
 </section>
-<section id="the-model" class="slide level2">
-<h2>The model</h2>
-<p><span class="math display">\[\text{sales}_i = \beta_0 + \beta_1\,\text{ad\_spend}_i + \beta_2\,\text{price}_i + \varepsilon_i\]</span></p>
-<ul>
-<li>The model describes the <strong>conditional mean</strong> of Y given the Xs</li>
-<li><span class="math inline">\(\beta_k\)</span>: expected change in Y for a one-unit change in <span class="math inline">\(X_k\)</span>, <strong>holding the other Xs constant</strong></li>
-<li>“Holding constant” is the entire point of <em>multiple</em> regression</li>
-</ul>
-</section>
-<section id="how-the-line-is-chosen-ols" class="slide level2">
-<h2>How the line is chosen: OLS</h2>
-<ul>
-<li>OLS picks the <span class="math inline">\(\beta\)</span>s that minimize the sum of <strong>squared residuals</strong></li>
-<li>Residual = actual − predicted: what the model missed</li>
-</ul>
-
-<img data-src="deck1_regression_I_files/figure-revealjs/unnamed-chunk-2-1.png" width="960" class="r-stretch"><aside class="notes">
-<p>One intuitive picture; no derivation. “Best” has a precise meaning — we give it a name (BLUE) tomorrow.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section></section>
-<section>
-<section id="running-it-in-r" class="title-slide slide level1 center" data-background-color="#1a3a5c">
-<h1>Running It in R</h1>
-
-</section>
-<section id="lm-one-line" class="slide level2">
-<h2><code>lm()</code>: one line</h2>
+<section id="your-first-multiple-regression" class="slide level2">
+<h2>Your first multiple regression</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="" aria-label="1"></a>m1 <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales <span class="sc">~</span> ad_spend <span class="sc">+</span> price <span class="sc">+</span> store_size, <span class="at">data =</span> storemax)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a>m1 <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales <span class="sc">~</span> ad_spend <span class="sc">+</span> price <span class="sc">+</span> store_size, <span class="at">data =</span> storemax)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>That’s it. The work is in <strong>reading</strong> what comes back.</p>
+<ul>
+<li>Formula: <code>outcome ~ predictor1 + predictor2 + ...</code></li>
+<li>One line to fit the model. The work is in <strong>reading</strong> what comes back</li>
+</ul>
 </section>
-<section id="anatomy-of-summary-the-whole-output" class="slide level2">
-<h2>Anatomy of <code>summary()</code> — the whole output</h2>
+<section id="the-whole-output" class="slide level2">
+<h2>The whole output</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="" aria-label="1"></a><span class="fu">summary</span>(m1)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m1)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 Call:
@@ -353,7 +865,7 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
 </div>
 </div>
 <aside class="notes">
-<p>Spend real time here. Walk every line on the next slides.</p>
+<p>Let them stare at it for 20 seconds. Then: “every number here has a job. By the end of this block you’ll know each one, and how to pull it out.” Point back to the output-notation key.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -366,56 +878,130 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
           display:block!important;
       }</style></aside>
 </section>
-<section id="anatomy-line-by-line" class="slide level2">
-<h2>Anatomy, line by line</h2>
+<section id="anatomy-the-coefficient-table" class="slide level2 dense">
+<h2>Anatomy: the coefficient table</h2>
 <table class="caption-top">
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 16%">
+<col style="width: 44%">
+<col style="width: 39%">
 </colgroup>
 <thead>
 <tr class="header">
-<th>Piece</th>
-<th>What it is</th>
-<th>What it is <strong>not</strong></th>
+<th style="text-align: left;">Column</th>
+<th style="text-align: left;">What it is</th>
+<th style="text-align: left;">What it is <strong>not</strong></th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>Estimate</code></td>
-<td>the fitted <span class="math inline">\(\beta\)</span></td>
-<td>a causal effect</td>
+<td style="text-align: left;"><code>Estimate</code></td>
+<td style="text-align: left;"><span class="math inline">\(\hat\beta_j\)</span>, the fitted coefficient</td>
+<td style="text-align: left;">a causal effect</td>
 </tr>
 <tr class="even">
-<td><code>Std. Error</code></td>
-<td>uncertainty in <span class="math inline">\(\beta\)</span></td>
-<td>the spread of Y</td>
+<td style="text-align: left;"><code>Std. Error</code></td>
+<td style="text-align: left;">uncertainty in <span class="math inline">\(\hat\beta_j\)</span> (valid only if Promises 4–5 hold)</td>
+<td style="text-align: left;">the spread of Y</td>
 </tr>
 <tr class="odd">
-<td><code>t value</code>, <code>Pr(&gt;|t|)</code></td>
-<td>test of <span class="math inline">\(\beta = 0\)</span></td>
-<td>effect size</td>
+<td style="text-align: left;"><code>t value</code></td>
+<td style="text-align: left;">Estimate ÷ Std. Error</td>
+<td style="text-align: left;">an effect size</td>
 </tr>
 <tr class="even">
-<td><code>R-squared</code></td>
-<td>share of <strong>variance</strong> explained</td>
-<td>share of sales explained</td>
-</tr>
-<tr class="odd">
-<td><code>F-statistic</code></td>
-<td>all slopes = 0, jointly</td>
-<td>model “correctness”</td>
+<td style="text-align: left;"><code>Pr(&gt;|t|)</code></td>
+<td style="text-align: left;">p-value for <span class="math inline">\(H_0: \beta_j = 0\)</span></td>
+<td style="text-align: left;">the probability the effect is real</td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="output-sentence" class="slide level2 smaller">
+<section id="anatomy-the-model-level-lines" class="slide level2 dense">
+<h2>Anatomy: the model-level lines</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 22%">
+<col style="width: 44%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Line</th>
+<th style="text-align: left;">What it is</th>
+<th style="text-align: left;">What it is <strong>not</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>Residual standard error</code></td>
+<td style="text-align: left;">typical size of a residual (in Y units); df = n − k − 1</td>
+<td style="text-align: left;">the SE of a coefficient</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>Multiple R-squared</code></td>
+<td style="text-align: left;">share of the <strong>variance</strong> in Y explained</td>
+<td style="text-align: left;">share of sales explained</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>Adjusted R-squared</code></td>
+<td style="text-align: left;">R² penalized for the number of predictors</td>
+<td style="text-align: left;">a significance test</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>F-statistic</code></td>
+<td style="text-align: left;">test that <strong>all</strong> slopes = 0 jointly</td>
+<td style="text-align: left;">proof the model is correct</td>
+</tr>
+</tbody>
+</table>
+<aside class="notes">
+<p>df: n − k − 1 = 400 − 3 − 1 = 396. Point to it in the output. This is why we use k for predictors and n for sample size.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="confidence-intervals-a-range-for-every-estimate" class="slide level2">
+<h2>Confidence intervals: a range for every estimate</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">confint</span>(m1)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                2.5 %     97.5 %
+(Intercept) 799.45320 2277.64957
+ad_spend     66.05754  132.61546
+price        31.87174   91.65521
+store_size   20.78334   37.26413</code></pre>
+</div>
+</div>
+<ul>
+<li>95% CI ≈ Estimate ± 2 × Std. Error</li>
+<li>Excludes 0 ⇔ p &lt; .05 (same information, more useful format)</li>
+<li>Reviewers increasingly prefer CIs to stars</li>
+</ul>
+</section>
+<section id="output-sentence" class="slide level2">
 <h2>Output → Sentence</h2>
 <div class="cell">
 <div class="cell-output-display">
 <div class="kable-table">
 <table class="caption-top">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 13%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 11%">
+<col style="width: 13%">
+<col style="width: 14%">
+</colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">term</th>
@@ -423,6 +1009,8 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
 <th style="text-align: right;">std.error</th>
 <th style="text-align: right;">statistic</th>
 <th style="text-align: right;">p.value</th>
+<th style="text-align: right;">conf.low</th>
+<th style="text-align: right;">conf.high</th>
 </tr>
 </thead>
 <tbody>
@@ -432,6 +1020,8 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
 <td style="text-align: right;">375.95</td>
 <td style="text-align: right;">4.09</td>
 <td style="text-align: right;">0</td>
+<td style="text-align: right;">799.45</td>
+<td style="text-align: right;">2277.65</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">ad_spend</td>
@@ -439,6 +1029,8 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
 <td style="text-align: right;">16.93</td>
 <td style="text-align: right;">5.87</td>
 <td style="text-align: right;">0</td>
+<td style="text-align: right;">66.06</td>
+<td style="text-align: right;">132.62</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">price</td>
@@ -446,6 +1038,8 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
 <td style="text-align: right;">15.20</td>
 <td style="text-align: right;">4.06</td>
 <td style="text-align: right;">0</td>
+<td style="text-align: right;">31.87</td>
+<td style="text-align: right;">91.66</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">store_size</td>
@@ -453,54 +1047,24 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
 <td style="text-align: right;">4.19</td>
 <td style="text-align: right;">6.92</td>
 <td style="text-align: right;">0</td>
+<td style="text-align: right;">20.78</td>
+<td style="text-align: right;">37.26</td>
 </tr>
 </tbody>
 </table>
 </div>
 </div>
 </div>
-<p><strong>What we can now say:</strong></p>
 <blockquote>
-<p>“Holding price and store size constant, each additional $1,000 of weekly ad spend is associated with roughly ___ additional units sold (b = <strong><em>, p </em></strong> ).”</p>
+<p>“Holding price and store size constant, each additional $1,000 of weekly ad spend is associated with about 99 additional units sold per week (b = 99.3, 95% CI [66.1, 132.6]).”</p>
 </blockquote>
-<p><strong>Fill in the blanks. Every number in the table has a sentence.</strong></p>
+<p><strong>Every number in the table has a sentence.</strong> Write the one for <code>store_size</code>.</p>
 </section>
-<section id="mis-interpretation-check" class="slide level2">
-<h2>Mis-interpretation check ❌</h2>
-<p>Would a reviewer let these through?</p>
-<ol type="1">
-<li>“Ad spend <strong>drives</strong> sales up by 100 units.”</li>
-<li>“The model <strong>explains 60% of sales</strong>.”</li>
-<li>“Price is not significant, so price <strong>has no effect</strong>.”</li>
-</ol>
-<aside class="notes">
-<ol type="1">
-<li>causal verb from observational data; (2) variance ≠ level;</li>
-<li>absence of evidence ≠ evidence of absence. Recurring segment — same game appears on quizzes.</li>
-</ol>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section></section>
-<section>
-<section id="categorical-predictors" class="title-slide slide level1 center" data-background-color="#1a3a5c">
-<h1>Categorical Predictors</h1>
-
-</section>
-<section id="dummy-variables-region" class="slide level2">
-<h2>Dummy variables: region</h2>
+<section id="categorical-predictors-dummy-variables" class="slide level2">
+<h2>Categorical predictors: dummy variables</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="" aria-label="1"></a>m2 <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales <span class="sc">~</span> ad_spend <span class="sc">+</span> price <span class="sc">+</span> store_size <span class="sc">+</span> region,</span>
-<span id="cb6-2"><a href="" aria-label="2"></a>         <span class="at">data =</span> storemax)</span>
-<span id="cb6-3"><a href="" aria-label="3"></a><span class="fu">tidy</span>(m2) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">where</span>(is.numeric), <span class="sc">~</span><span class="fu">round</span>(., <span class="dv">1</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="" aria-hidden="true" tabindex="-1"></a>m2 <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales <span class="sc">~</span> ad_spend <span class="sc">+</span> price <span class="sc">+</span> store_size <span class="sc">+</span> region, <span class="at">data =</span> storemax)</span>
+<span id="cb11-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">tidy</span>(m2) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">where</span>(is.numeric), <span class="sc">~</span> <span class="fu">round</span>(.x, <span class="dv">1</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div class="kable-table">
 <table class="caption-top">
@@ -569,47 +1133,27 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
 </div>
 </div>
 <ul>
-<li>R picks a <strong>reference category</strong> (first level: Southeast)</li>
-<li>Each coefficient = that region <strong>vs.&nbsp;the reference</strong>, holding the rest constant</li>
+<li>A factor with 4 levels → <strong>3 dummies</strong>; the first level (Southeast) is the <strong>reference</strong></li>
+<li>Each dummy coefficient = that region <strong>vs.&nbsp;Southeast</strong>, holding the other Xs constant</li>
 </ul>
 </section>
-<section id="output-sentence-1" class="slide level2">
-<h2>Output → Sentence</h2>
+<section id="output-sentence-dummies" class="slide level2">
+<h2>Output → Sentence: dummies</h2>
 <blockquote>
-<p>“Compared with Southeast stores (the reference), Northeast stores sell about ___ more units per week, holding ad spend, price, and store size constant.”</p>
+<p>“Compared with Southeast stores (the reference), Northeast stores sell about 948 more units per week, holding ad spend, price, and store size constant.”</p>
 </blockquote>
-<ul>
-<li>Changing the reference changes the coefficients, <strong>not the model</strong></li>
-<li><code>relevel()</code> demo: same fit, different comparisons</li>
-</ul>
-</section>
-<section id="standardized-vs.-unstandardized" class="slide level2">
-<h2>Standardized vs.&nbsp;unstandardized</h2>
+<p>Changing the reference changes the <strong>comparisons</strong>, not the model:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="" aria-label="1"></a>m2_std <span class="ot">&lt;-</span> <span class="fu">lm</span>(<span class="fu">scale</span>(sales) <span class="sc">~</span> <span class="fu">scale</span>(ad_spend) <span class="sc">+</span> <span class="fu">scale</span>(price) <span class="sc">+</span></span>
-<span id="cb7-2"><a href="" aria-label="2"></a>             <span class="fu">scale</span>(store_size) <span class="sc">+</span> region, <span class="at">data =</span> storemax)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="" aria-hidden="true" tabindex="-1"></a>m2b <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales <span class="sc">~</span> ad_spend <span class="sc">+</span> price <span class="sc">+</span> store_size <span class="sc">+</span></span>
+<span id="cb12-2"><a href="" aria-hidden="true" tabindex="-1"></a>            <span class="fu">relevel</span>(region, <span class="at">ref =</span> <span class="st">"West"</span>), <span class="at">data =</span> storemax)</span>
+<span id="cb12-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">R2_original =</span> <span class="fu">summary</span>(m2)<span class="sc">$</span>r.squared, <span class="at">R2_releveled =</span> <span class="fu">summary</span>(m2b)<span class="sc">$</span>r.squared)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> R2_original R2_releveled 
+   0.4385534    0.4385534 </code></pre>
 </div>
-<ul>
-<li>Unstandardized: real units → best for <strong>substantive</strong> sentences</li>
-<li>Standardized: SD units → comparing <strong>relative importance</strong> within a model</li>
-<li>Never compare standardized βs <strong>across</strong> different samples/models</li>
-</ul>
-</section></section>
-<section>
-<section id="lab" class="title-slide slide level1 center" data-background-color="#2c5f2d">
-<h1>Lab</h1>
-
-</section>
-<section id="lab-1-your-turn-with-storemax" class="slide level2">
-<h2>Lab 1: Your turn with StoreMax</h2>
-<ol type="1">
-<li>Fit <code>sales ~ ad_spend + price + store_size + region</code></li>
-<li>Produce the tidy coefficient table (<code>broom::tidy()</code>)</li>
-<li><strong>Deliverable: write the three sentences</strong> this table supports — one continuous predictor, one dummy, one about model fit</li>
-<li>Swap with a neighbor: would a reviewer let their sentences through?</li>
-</ol>
+</div>
 <aside class="notes">
-<p>Deliverable is prose, not output. ~40 min. Circulate; collect the two best and two most instructive wrong sentences for debrief.</p>
+<p>Same R², same fitted values, different rows in the table. Ask: “what does the Northeast coefficient mean now?” (Northeast vs.&nbsp;West.)</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -621,21 +1165,731 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
           overflow: hidden!important;
           display:block!important;
       }</style></aside>
+</section>
+<section id="mis-interpretation-check" class="slide level2 scrollable">
+<h2>Mis-interpretation check ❌</h2>
+<p>Would a reviewer let these through?</p>
+<ol type="1">
+<li>“Ad spend <strong>drives</strong> sales up by 98 units.”</li>
+<li>“The model <strong>explains 44% of sales</strong>.”</li>
+<li>“Price is not significant, so price <strong>has no effect</strong>.”</li>
+<li>“Northeast has the <strong>largest effect</strong> because its coefficient is biggest.”</li>
+<li>“p &lt; .001, so the effect is <strong>large</strong>.”</li>
+</ol>
+<aside class="notes">
+<ol type="1">
+<li>causal verb from observational data (and Promise 3 is unverified);</li>
+<li>variance, not level; (3) absence of evidence ≠ evidence of absence;</li>
+<li>dummies are comparisons against the reference, not “effects” ranked by size; (5) significance ≠ magnitude. This game recurs all course, and quiz questions use the same format.</li>
+</ol>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="getting-numbers-out-three-levels-of-output" class="slide level2 dense">
+<h2>Getting numbers out: three levels of output</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 25%">
+<col style="width: 48%">
+<col style="width: 13%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Level</th>
+<th style="text-align: left;">What</th>
+<th style="text-align: left;">Base R</th>
+<th style="text-align: left;">broom</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Coefficient</strong></td>
+<td style="text-align: left;">estimates, SEs, t, p, CIs</td>
+<td style="text-align: left;"><code>coef()</code>, <code>summary(m)$coefficients</code>, <code>confint()</code></td>
+<td style="text-align: left;"><code>tidy()</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Model</strong></td>
+<td style="text-align: left;">R², adj. R², F, σ, n</td>
+<td style="text-align: left;"><code>summary(m)$r.squared</code>, <code>sigma()</code>, <code>nobs()</code></td>
+<td style="text-align: left;"><code>glance()</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Observation</strong></td>
+<td style="text-align: left;">fitted values, residuals</td>
+<td style="text-align: left;"><code>fitted()</code>, <code>residuals()</code></td>
+<td style="text-align: left;"><code>augment()</code></td>
+</tr>
+</tbody>
+</table>
+<p>Why extract instead of copying? <strong>Copy-pasting numbers into a manuscript invites errors; extracting them makes your analysis reproducible.</strong></p>
+</section>
+<section id="base-r-whats-inside-the-object" class="slide level2">
+<h2>Base R: what’s inside the object</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="" aria-hidden="true" tabindex="-1"></a>s <span class="ot">&lt;-</span> <span class="fu">summary</span>(m2)</span>
+<span id="cb14-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">coef</span>(m2)                              <span class="co"># estimates</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    (Intercept)        ad_spend           price      store_size regionNortheast 
+     1145.10497        97.80904        63.73801        28.36428       948.39373 
+  regionMidwest      regionWest 
+      288.31924       533.27823 </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="" aria-hidden="true" tabindex="-1"></a>s<span class="sc">$</span>coefficients[, <span class="st">"Std. Error"</span>]        <span class="co"># standard errors</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    (Intercept)        ad_spend           price      store_size regionNortheast 
+     354.938091       15.873352       14.259248        3.930189      124.235132 
+  regionMidwest      regionWest 
+     125.778942      136.058234 </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="" aria-hidden="true" tabindex="-1"></a>s<span class="sc">$</span>coefficients[, <span class="st">"Pr(&gt;|t|)"</span>]          <span class="co"># p-values</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    (Intercept)        ad_spend           price      store_size regionNortheast 
+   1.359490e-03    1.781956e-09    1.024933e-05    2.763129e-12    1.746178e-13 
+  regionMidwest      regionWest 
+   2.241793e-02    1.046664e-04 </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">R2 =</span> s<span class="sc">$</span>r.squared, <span class="at">adjR2 =</span> s<span class="sc">$</span>adj.r.squared, <span class="at">sigma =</span> s<span class="sc">$</span>sigma)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>         R2       adjR2       sigma 
+  0.4385534   0.4299817 932.6548098 </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="" aria-hidden="true" tabindex="-1"></a>s<span class="sc">$</span>fstatistic                          <span class="co"># F, numerator df, denominator df</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    value     numdf     dendf 
+ 51.16292   6.00000 393.00000 </code></pre>
+</div>
+</div>
+<aside class="notes">
+<p>Optional: <code>str(s)</code> to show the full list structure. It demystifies the object; students see summary() is just a list of named pieces.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="broom-the-modern-way" class="slide level2">
+<h2>broom: the modern way</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">tidy</span>(m2, <span class="at">conf.int =</span> <span class="cn">TRUE</span>)   <span class="co"># one row per coefficient</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="kable-table">
+<table class="caption-top">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 13%">
+<col style="width: 13%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 13%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">term</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">std.error</th>
+<th style="text-align: right;">statistic</th>
+<th style="text-align: right;">p.value</th>
+<th style="text-align: right;">conf.low</th>
+<th style="text-align: right;">conf.high</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: right;">1145.10497</td>
+<td style="text-align: right;">354.938091</td>
+<td style="text-align: right;">3.226210</td>
+<td style="text-align: right;">0.0013595</td>
+<td style="text-align: right;">447.29008</td>
+<td style="text-align: right;">1842.91987</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ad_spend</td>
+<td style="text-align: right;">97.80904</td>
+<td style="text-align: right;">15.873352</td>
+<td style="text-align: right;">6.161839</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">66.60174</td>
+<td style="text-align: right;">129.01635</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">price</td>
+<td style="text-align: right;">63.73801</td>
+<td style="text-align: right;">14.259248</td>
+<td style="text-align: right;">4.469942</td>
+<td style="text-align: right;">0.0000102</td>
+<td style="text-align: right;">35.70406</td>
+<td style="text-align: right;">91.77196</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">store_size</td>
+<td style="text-align: right;">28.36428</td>
+<td style="text-align: right;">3.930189</td>
+<td style="text-align: right;">7.217026</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">20.63745</td>
+<td style="text-align: right;">36.09110</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">regionNortheast</td>
+<td style="text-align: right;">948.39373</td>
+<td style="text-align: right;">124.235132</td>
+<td style="text-align: right;">7.633861</td>
+<td style="text-align: right;">0.0000000</td>
+<td style="text-align: right;">704.14515</td>
+<td style="text-align: right;">1192.64232</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">regionMidwest</td>
+<td style="text-align: right;">288.31924</td>
+<td style="text-align: right;">125.778942</td>
+<td style="text-align: right;">2.292270</td>
+<td style="text-align: right;">0.0224179</td>
+<td style="text-align: right;">41.03550</td>
+<td style="text-align: right;">535.60298</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">regionWest</td>
+<td style="text-align: right;">533.27823</td>
+<td style="text-align: right;">136.058234</td>
+<td style="text-align: right;">3.919485</td>
+<td style="text-align: right;">0.0001047</td>
+<td style="text-align: right;">265.78521</td>
+<td style="text-align: right;">800.77125</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">glance</span>(m2)                  <span class="co"># one row per model</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="kable-table">
+<table class="caption-top">
+<colgroup>
+<col style="width: 9%">
+<col style="width: 12%">
+<col style="width: 8%">
+<col style="width: 9%">
+<col style="width: 7%">
+<col style="width: 2%">
+<col style="width: 9%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 9%">
+<col style="width: 11%">
+<col style="width: 4%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">r.squared</th>
+<th style="text-align: right;">adj.r.squared</th>
+<th style="text-align: right;">sigma</th>
+<th style="text-align: right;">statistic</th>
+<th style="text-align: right;">p.value</th>
+<th style="text-align: right;">df</th>
+<th style="text-align: right;">logLik</th>
+<th style="text-align: right;">AIC</th>
+<th style="text-align: right;">BIC</th>
+<th style="text-align: right;">deviance</th>
+<th style="text-align: right;">df.residual</th>
+<th style="text-align: right;">nobs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0.4385534</td>
+<td style="text-align: right;">0.4299817</td>
+<td style="text-align: right;">932.6548</td>
+<td style="text-align: right;">51.16292</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">-3299.258</td>
+<td style="text-align: right;">6614.517</td>
+<td style="text-align: right;">6646.449</td>
+<td style="text-align: right;">341849083</td>
+<td style="text-align: right;">393</td>
+<td style="text-align: right;">400</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">augment</span>(m2) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">3</span>)      <span class="co"># one row per observation</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="kable-table">
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 5%">
+<col style="width: 8%">
+<col style="width: 5%">
+<col style="width: 10%">
+<col style="width: 9%">
+<col style="width: 8%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 8%">
+<col style="width: 9%">
+<col style="width: 10%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">sales</th>
+<th style="text-align: right;">ad_spend</th>
+<th style="text-align: right;">price</th>
+<th style="text-align: right;">store_size</th>
+<th style="text-align: left;">region</th>
+<th style="text-align: right;">.fitted</th>
+<th style="text-align: right;">.resid</th>
+<th style="text-align: right;">.hat</th>
+<th style="text-align: right;">.sigma</th>
+<th style="text-align: right;">.cooksd</th>
+<th style="text-align: right;">.std.resid</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">5369</td>
+<td style="text-align: right;">14.6</td>
+<td style="text-align: right;">15.41</td>
+<td style="text-align: right;">38.6</td>
+<td style="text-align: left;">Northeast</td>
+<td style="text-align: right;">5598.574</td>
+<td style="text-align: right;">-229.5745</td>
+<td style="text-align: right;">0.0150517</td>
+<td style="text-align: right;">933.7706</td>
+<td style="text-align: right;">0.0001343</td>
+<td style="text-align: right;">-0.2480253</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4017</td>
+<td style="text-align: right;">13.5</td>
+<td style="text-align: right;">25.81</td>
+<td style="text-align: right;">21.3</td>
+<td style="text-align: left;">Midwest</td>
+<td style="text-align: right;">5003.083</td>
+<td style="text-align: right;">-986.0834</td>
+<td style="text-align: right;">0.0185235</td>
+<td style="text-align: right;">932.4895</td>
+<td style="text-align: right;">0.0030708</td>
+<td style="text-align: right;">-1.0672170</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">6412</td>
+<td style="text-align: right;">16.7</td>
+<td style="text-align: right;">21.59</td>
+<td style="text-align: right;">46.4</td>
+<td style="text-align: left;">West</td>
+<td style="text-align: right;">6004.000</td>
+<td style="text-align: right;">407.9998</td>
+<td style="text-align: right;">0.0164535</td>
+<td style="text-align: right;">933.6125</td>
+<td style="text-align: right;">0.0004650</td>
+<td style="text-align: right;">0.4411046</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<ul>
+<li>Each returns a <strong>data frame</strong>, ready to filter, round, and export</li>
+</ul>
+</section>
+<section id="verify-the-table-every-number-comes-from-others" class="slide level2">
+<h2>Verify the table: every number comes from others</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="" aria-hidden="true" tabindex="-1"></a>est <span class="ot">&lt;-</span> <span class="fu">coef</span>(m2)[<span class="st">"ad_spend"</span>]</span>
+<span id="cb27-2"><a href="" aria-hidden="true" tabindex="-1"></a>se  <span class="ot">&lt;-</span> s<span class="sc">$</span>coefficients[<span class="st">"ad_spend"</span>, <span class="st">"Std. Error"</span>]</span>
+<span id="cb27-3"><a href="" aria-hidden="true" tabindex="-1"></a>df  <span class="ot">&lt;-</span> <span class="fu">df.residual</span>(m2)                      <span class="co"># n - k - 1</span></span>
+<span id="cb27-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-5"><a href="" aria-hidden="true" tabindex="-1"></a>t_hand  <span class="ot">&lt;-</span> est <span class="sc">/</span> se</span>
+<span id="cb27-6"><a href="" aria-hidden="true" tabindex="-1"></a>p_hand  <span class="ot">&lt;-</span> <span class="dv">2</span> <span class="sc">*</span> <span class="fu">pt</span>(<span class="sc">-</span><span class="fu">abs</span>(t_hand), df)</span>
+<span id="cb27-7"><a href="" aria-hidden="true" tabindex="-1"></a>ci_hand <span class="ot">&lt;-</span> est <span class="sc">+</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>) <span class="sc">*</span> <span class="fu">qt</span>(.<span class="dv">975</span>, df) <span class="sc">*</span> se</span>
+<span id="cb27-8"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-9"><a href="" aria-hidden="true" tabindex="-1"></a>r2_hand <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">-</span> <span class="fu">sum</span>(<span class="fu">residuals</span>(m2)<span class="sc">^</span><span class="dv">2</span>) <span class="sc">/</span></span>
+<span id="cb27-10"><a href="" aria-hidden="true" tabindex="-1"></a>               <span class="fu">sum</span>((storemax<span class="sc">$</span>sales <span class="sc">-</span> <span class="fu">mean</span>(storemax<span class="sc">$</span>sales))<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb27-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-12"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">t =</span> t_hand, <span class="at">p =</span> p_hand, <span class="at">ci_low =</span> ci_hand[<span class="dv">1</span>], <span class="at">ci_high =</span> ci_hand[<span class="dv">2</span>], <span class="at">R2 =</span> r2_hand)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  t.ad_spend   p.ad_spend       ci_low      ci_high           R2 
+6.161839e+00 1.781956e-09 6.660174e+01 1.290163e+02 4.385534e-01 </code></pre>
+</div>
+</div>
+<p>Compare with <code>summary(m2)</code>: identical.</p>
+<aside class="notes">
+<p>The payoff for the paper-based quizzes: if you know how the numbers relate, you can spot a table that doesn’t add up (e.g., an estimate and SE whose ratio doesn’t match the reported t).</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="try-it-10-min" class="slide level2 scrollable">
+<h2>Try it (≈10 min)</h2>
+<p>Using <code>m2</code>:</p>
+<ol type="1">
+<li>Extract the p-value for <code>price</code> <strong>two ways</strong> (base R and broom)</li>
+<li>Extract adjusted R² and the residual standard error</li>
+<li>Recompute the 95% CI for <code>store_size</code> by hand and check it against <code>confint()</code></li>
+<li>Write <strong>one sentence</strong> each for <code>store_size</code> and <code>regionWest</code></li>
+</ol>
 </section></section>
 <section>
-<section id="reading-the-literature" class="title-slide slide level1 center" data-background-color="#1a3a5c">
-<h1>Reading the Literature</h1>
+<section id="block-4-holding-constant-partial-correlations-standardization" class="title-slide slide level1 center" data-background-color="#1a3a5c">
+<h1>Block 4 — Holding Constant, Partial Correlations, Standardization</h1>
 
 </section>
-<section id="interpretation-audit-a-published-table" class="slide level2">
-<h2>Interpretation audit: a published table</h2>
+<section id="what-does-holding-constant-actually-mean" class="slide level2">
+<h2>What does “holding constant” actually mean?</h2>
+<p>A coefficient in multiple regression is the slope of Y on X <strong>after removing from both what the other predictors explain</strong>:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: strip from sales what the other Xs explain</span></span>
+<span id="cb29-2"><a href="" aria-hidden="true" tabindex="-1"></a>r_y <span class="ot">&lt;-</span> <span class="fu">residuals</span>(<span class="fu">lm</span>(sales <span class="sc">~</span> price <span class="sc">+</span> store_size <span class="sc">+</span> region, <span class="at">data =</span> storemax))</span>
+<span id="cb29-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: strip from ad_spend what the other Xs explain</span></span>
+<span id="cb29-4"><a href="" aria-hidden="true" tabindex="-1"></a>r_x <span class="ot">&lt;-</span> <span class="fu">residuals</span>(<span class="fu">lm</span>(ad_spend <span class="sc">~</span> price <span class="sc">+</span> store_size <span class="sc">+</span> region, <span class="at">data =</span> storemax))</span>
+<span id="cb29-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 3: regress leftover on leftover</span></span>
+<span id="cb29-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">residual_slope =</span> <span class="fu">unname</span>(<span class="fu">coef</span>(<span class="fu">lm</span>(r_y <span class="sc">~</span> r_x))[<span class="dv">2</span>]),</span>
+<span id="cb29-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="at">multiple_reg   =</span> <span class="fu">unname</span>(<span class="fu">coef</span>(m2)[<span class="st">"ad_spend"</span>]))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>residual_slope   multiple_reg 
+      97.80904       97.80904 </code></pre>
+</div>
+</div>
+<p>Same number. <strong>That is what “holding constant” means.</strong></p>
+</section>
+<section id="seeing-it-the-added-variable-plot" class="slide level2">
+<h2>Seeing it: the added-variable plot</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">tibble</span>(r_x, r_y), <span class="fu">aes</span>(r_x, r_y)) <span class="sc">+</span></span>
+<span id="cb31-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> .<span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb31-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb31-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Ad spend, net of other predictors"</span>,</span>
+<span id="cb31-5"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Sales, net of other predictors"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+</div>
+<img data-src="deck1_regression_I_files/figure-revealjs/unnamed-chunk-15-1.png" width="960" class="r-stretch"><ul>
+<li>The slope of this line = the <code>ad_spend</code> coefficient in <code>m2</code></li>
+<li><code>car::avPlots()</code> draws these for every predictor at once</li>
+</ul>
+</section>
+<section id="partial-vs.-semi-partial-correlation" class="slide level2">
+<h2>Partial vs.&nbsp;semi-partial correlation</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 20%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: left;">Remove other Xs from…</th>
+<th style="text-align: left;">Answers</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Partial r</strong></td>
+<td style="text-align: left;">both X and Y</td>
+<td style="text-align: left;">“How strongly are X and Y related, net of everything else?”</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Semi-partial (part) r</strong></td>
+<td style="text-align: left;">X only</td>
+<td style="text-align: left;">“How much does X <strong>uniquely</strong> add to explaining Y?”</td>
+</tr>
+</tbody>
+</table>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="" aria-hidden="true" tabindex="-1"></a>partial_r     <span class="ot">&lt;-</span> <span class="fu">cor</span>(r_y, r_x)</span>
+<span id="cb32-2"><a href="" aria-hidden="true" tabindex="-1"></a>semipartial_r <span class="ot">&lt;-</span> <span class="fu">cor</span>(storemax<span class="sc">$</span>sales, r_x)</span>
+<span id="cb32-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">partial =</span> partial_r, <span class="at">semipartial =</span> semipartial_r)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    partial semipartial 
+  0.2968163   0.2328994 </code></pre>
+</div>
+</div>
+</section>
+<section id="semi-partial²-unique-contribution-δr²" class="slide level2">
+<h2>Semi-partial² = unique contribution = ΔR²</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="" aria-hidden="true" tabindex="-1"></a>m_without <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales <span class="sc">~</span> price <span class="sc">+</span> store_size <span class="sc">+</span> region, <span class="at">data =</span> storemax)</span>
+<span id="cb34-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">semipartial_sq =</span> semipartial_r<span class="sc">^</span><span class="dv">2</span>,</span>
+<span id="cb34-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="at">delta_R2       =</span> <span class="fu">summary</span>(m2)<span class="sc">$</span>r.squared <span class="sc">-</span> <span class="fu">summary</span>(m_without)<span class="sc">$</span>r.squared)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>semipartial_sq       delta_R2 
+    0.05424212     0.05424212 </code></pre>
+</div>
+</div>
 <ul>
-<li>[Insert Table from your chosen JMR/JM paper]</li>
-<li>Text covered: <strong>you write the sentences</strong> the table supports</li>
-<li>Then: reveal what the authors wrote — compare</li>
+<li>The squared semi-partial = the R² <strong>gained by adding ad spend last</strong></li>
+<li>Tomorrow this becomes the core tool for <strong>nested model comparison</strong></li>
 </ul>
 <aside class="notes">
-<p>Pick a paper whose Table has a continuous predictor, a dummy, and R². The audit format beats “here’s how they used it.”</p>
+<p>Optional aside: partial r² = t² / (t² + df). Another “every number comes from others” moment.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="which-predictor-matters-most-the-units-problem" class="slide level2">
+<h2>Which predictor matters most? The units problem</h2>
+<ul>
+<li><code>ad_spend</code> is in $000s, <code>price</code> in dollars, <code>store_size</code> in 1,000 sq ft</li>
+<li>Raw coefficients <strong>cannot be compared</strong> across predictors: a “unit” means different things</li>
+<li>Common fix in the literature: <strong>standardize</strong> (convert to z-scores: mean 0, SD 1)</li>
+</ul>
+</section>
+<section id="three-ways-to-scale-a-regression" class="slide level2">
+<h2>Three ways to scale a regression</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 37%">
+<col style="width: 62%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Version</th>
+<th style="text-align: left;">Coefficient means…</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Raw X, raw Y</strong></td>
+<td style="text-align: left;">change in Y units per <strong>one-unit</strong> change in X</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Standardized X only</strong></td>
+<td style="text-align: left;">change in Y units per <strong>one-SD</strong> change in X</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Standardized X and Y</strong> (“beta weights”)</td>
+<td style="text-align: left;">change in <strong>SDs of Y</strong> per <strong>one-SD</strong> change in X</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>In simple regression, the fully standardized slope <strong>equals r</strong></li>
+<li>“X only” is often the most readable for business audiences: Y stays in real units</li>
+</ul>
+</section>
+<section id="standardizing-in-r" class="slide level2">
+<h2>Standardizing in R</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="" aria-hidden="true" tabindex="-1"></a>storemax_z <span class="ot">&lt;-</span> storemax <span class="sc">|&gt;</span></span>
+<span id="cb36-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">c</span>(ad_spend, price, store_size),</span>
+<span id="cb36-3"><a href="" aria-hidden="true" tabindex="-1"></a>                <span class="sc">~</span> <span class="fu">as.numeric</span>(<span class="fu">scale</span>(.x)), <span class="at">.names =</span> <span class="st">"{.col}_z"</span>),</span>
+<span id="cb36-4"><a href="" aria-hidden="true" tabindex="-1"></a>         <span class="at">sales_z =</span> <span class="fu">as.numeric</span>(<span class="fu">scale</span>(sales)))</span>
+<span id="cb36-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-6"><a href="" aria-hidden="true" tabindex="-1"></a>m_raw <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales   <span class="sc">~</span> ad_spend   <span class="sc">+</span> price   <span class="sc">+</span> store_size   <span class="sc">+</span> region, <span class="at">data =</span> storemax_z)</span>
+<span id="cb36-7"><a href="" aria-hidden="true" tabindex="-1"></a>m_xz  <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales   <span class="sc">~</span> ad_spend_z <span class="sc">+</span> price_z <span class="sc">+</span> store_size_z <span class="sc">+</span> region, <span class="at">data =</span> storemax_z)</span>
+<span id="cb36-8"><a href="" aria-hidden="true" tabindex="-1"></a>m_bz  <span class="ot">&lt;-</span> <span class="fu">lm</span>(sales_z <span class="sc">~</span> ad_spend_z <span class="sc">+</span> price_z <span class="sc">+</span> store_size_z <span class="sc">+</span> region, <span class="at">data =</span> storemax_z)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<ul>
+<li>Note: <code>region</code> dummies are <strong>left as 0/1</strong>. Never standardize a dummy</li>
+</ul>
+</section>
+<section id="side-by-side-what-changes-what-doesnt" class="slide level2 dense">
+<h2>Side by side: what changes, what doesn’t</h2>
+<div class="cell">
+<div class="cell-output-display">
+<div class="kable-table">
+<table class="caption-top">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 11%">
+<col style="width: 13%">
+<col style="width: 16%">
+<col style="width: 12%">
+<col style="width: 14%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">term</th>
+<th style="text-align: right;">estimate_Raw</th>
+<th style="text-align: right;">estimate_X std</th>
+<th style="text-align: right;">estimate_X &amp; Y std</th>
+<th style="text-align: right;">statistic_Raw</th>
+<th style="text-align: right;">statistic_X std</th>
+<th style="text-align: right;">statistic_X &amp; Y std</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: right;">1145.10</td>
+<td style="text-align: right;">4810.85</td>
+<td style="text-align: right;">-0.32</td>
+<td style="text-align: right;">3.23</td>
+<td style="text-align: right;">59.38</td>
+<td style="text-align: right;">-4.92</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ad_spend</td>
+<td style="text-align: right;">97.81</td>
+<td style="text-align: right;">359.30</td>
+<td style="text-align: right;">0.29</td>
+<td style="text-align: right;">6.16</td>
+<td style="text-align: right;">6.16</td>
+<td style="text-align: right;">6.16</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">price</td>
+<td style="text-align: right;">63.74</td>
+<td style="text-align: right;">209.90</td>
+<td style="text-align: right;">0.17</td>
+<td style="text-align: right;">4.47</td>
+<td style="text-align: right;">4.47</td>
+<td style="text-align: right;">4.47</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">store_size</td>
+<td style="text-align: right;">28.36</td>
+<td style="text-align: right;">420.31</td>
+<td style="text-align: right;">0.34</td>
+<td style="text-align: right;">7.22</td>
+<td style="text-align: right;">7.22</td>
+<td style="text-align: right;">7.22</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">regionNortheast</td>
+<td style="text-align: right;">948.39</td>
+<td style="text-align: right;">948.39</td>
+<td style="text-align: right;">0.77</td>
+<td style="text-align: right;">7.63</td>
+<td style="text-align: right;">7.63</td>
+<td style="text-align: right;">7.63</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">regionMidwest</td>
+<td style="text-align: right;">288.32</td>
+<td style="text-align: right;">288.32</td>
+<td style="text-align: right;">0.23</td>
+<td style="text-align: right;">2.29</td>
+<td style="text-align: right;">2.29</td>
+<td style="text-align: right;">2.29</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">regionWest</td>
+<td style="text-align: right;">533.28</td>
+<td style="text-align: right;">533.28</td>
+<td style="text-align: right;">0.43</td>
+<td style="text-align: right;">3.92</td>
+<td style="text-align: right;">3.92</td>
+<td style="text-align: right;">3.92</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div class="kable-table">
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">version</th>
+<th style="text-align: right;">r.squared</th>
+<th style="text-align: right;">adj.r.squared</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Raw</td>
+<td style="text-align: right;">0.439</td>
+<td style="text-align: right;">0.43</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">X std</td>
+<td style="text-align: right;">0.439</td>
+<td style="text-align: right;">0.43</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">X &amp; Y std</td>
+<td style="text-align: right;">0.439</td>
+<td style="text-align: right;">0.43</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Point to the <code>statistic_</code> columns: slope t-values are identical across all three. R² identical. Only the estimates (units) and the intercept change.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="output-sentence-three-versions-one-finding" class="slide level2">
+<h2>Output → Sentence: three versions, one finding</h2>
+<ul>
+<li><strong>Raw:</strong> “Each additional $1,000 in ad spend is associated with 98 more units per week.”</li>
+<li><strong>X standardized:</strong> “A one-SD increase in ad spend is associated with 359 more units per week.”</li>
+<li><strong>X &amp; Y standardized:</strong> “A one-SD increase in ad spend is associated with a 0.29-SD increase in weekly sales.”</li>
+</ul>
+<p>All three, holding price, store size, and region constant.</p>
+</section>
+<section id="standardization-read-before-you-interpret" class="slide level2">
+<h2>⚠️ Standardization: read before you interpret</h2>
+<ul>
+<li><strong>Same evidence, new units.</strong> Rescaling changes how coefficients read, not what the data say: slope t-values, p-values, and R² are identical. (The intercept’s test changes because its meaning changes.)</li>
+<li><strong>The intercept changes meaning.</strong> With centered X, it’s the predicted Y at the average X. With X and Y both standardized, it’s zero (for continuous predictors).</li>
+<li><strong>Never standardize a dummy variable.</strong> “A one-SD change in being in the Northeast” is meaningless. Interpret dummies in 0/1 form even when everything else is standardized.</li>
+<li><strong>Be careful with “relative importance.”</strong> Comparing beta weights <em>within</em> a model is shaky when predictors are correlated. Comparing them <em>across</em> samples or models is invalid.</li>
+<li><strong>Check the table note.</strong> In many published tables, “β” = standardized, “b”/“B” = unstandardized.</li>
+</ul>
+</section>
+<section id="try-it-15-min" class="slide level2 scrollable">
+<h2>Try it (≈15 min)</h2>
+<ol type="1">
+<li>Using <code>m_xz</code>, write the sentence for <code>store_size_z</code></li>
+<li>Using <code>m_bz</code>, which continuous predictor has the largest beta weight? Name one reason to be cautious about calling it “most important”</li>
+<li>Compute the semi-partial r² for <code>store_size</code> (hint: drop it, compare R²)</li>
+<li>Standardize <strong>only</strong> <code>price</code> and refit. Which numbers in the output changed, and which stayed the same?</li>
+</ol>
+<aside class="notes">
+<p>Block 4 has a little more room now (prediction and logs moved to tomorrow), so this exercise can run the full 15 minutes.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -651,17 +1905,15 @@ F-statistic: 71.47 on 3 and 396 DF,  p-value: &lt; 2.2e-16</code></pre>
 <section id="looking-ahead-to-tomorrow" class="slide level2">
 <h2>Looking ahead to tomorrow</h2>
 <ul>
-<li>Today we <strong>ran and read</strong> the model</li>
-<li>Tomorrow we ask: <strong>can we trust it?</strong>
-<ul>
-<li>The assumptions behind the output (Gauss-Markov)</li>
-<li>Diagnostics in R, and repairs</li>
-<li>Building and comparing models; interactions</li>
-<li>And a puzzle: what happens to the price coefficient when we add one more variable…</li>
-</ul></li>
+<li><strong>Checking the promises:</strong> diagnostics in R, and repairs (including <strong>logs</strong>, and elasticities)</li>
+<li><strong>Building and comparing models:</strong> nested models, ΔR², AIC/BIC</li>
+<li><strong>Predicting new data:</strong> <code>predict()</code>, prediction intervals, train/test split</li>
+<li><strong>Interactions:</strong> when the effect of X depends on another variable</li>
+<li><strong>A puzzle:</strong> what happens to the price coefficient when we add one more variable…</li>
+<li><strong>Difference-in-differences:</strong> a famous interaction, and a causal claim</li>
 </ul>
 <aside class="notes">
-<p>The cliffhanger is Simpson’s: price looks ~flat until market_affluence enters, then turns sharply negative. Don’t spoil it.</p>
+<p>Cliffhanger: price looks positive today. Tomorrow, adding market_affluence flips it negative (Simpson’s paradox). Don’t spoil it. Quiz 1 tomorrow morning covers today’s material: notation, the five promises and what each violation does, reading and extracting output, dummies, holding constant / partial correlations, and standardization.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
